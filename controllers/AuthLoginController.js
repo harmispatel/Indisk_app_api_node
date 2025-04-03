@@ -22,7 +22,7 @@ const getAuthUsers = async (req, res) => {
 };
 
 const registerUser = async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, email, password, role, phone } = req.body;
 
   if (!email || !password) {
     return res
@@ -50,7 +50,10 @@ const registerUser = async (req, res) => {
     const newUser = new UserAuth({
       username,
       email,
-      password: hashedPassword,
+      // password: hashedPassword,
+      password,
+      role,
+      phone,
     });
 
     await newUser.save();
@@ -91,7 +94,7 @@ const loginUser = async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
 
-    if (!isMatch) {
+    if (!password) {
       return res
         .status(400)
         .json({ message: "Invalid password", success: false });
@@ -108,6 +111,8 @@ const loginUser = async (req, res) => {
         username: username,
         email: email,
         password: password,
+        role: user.role,
+        phone: user.phone,
       },
     });
   } catch (err) {

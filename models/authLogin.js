@@ -6,6 +6,8 @@ const AuthData = mongoose.model(
     username: String,
     email: String,
     password: String,
+    role: String,
+    phone: Number,
     createdAt: { type: Date, default: Date.now },
   })
 );
