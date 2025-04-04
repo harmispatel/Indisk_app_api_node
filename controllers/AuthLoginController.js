@@ -4,8 +4,6 @@ const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 
-const SECRET_KEY = process.env.JWT_SECRET || "VANSH";
-
 const getAuthUsers = async (req, res) => {
   try {
     const users = await UserAuth.find();
@@ -102,16 +100,13 @@ const loginUser = async (req, res) => {
         .json({ message: "Invalid password", success: false });
     }
 
-    const token = jwt.sign(
-      { userId: user._id, username: user.username, email: user.email },
-      SECRET_KEY,
-      { expiresIn: "6h" }
-    );
+    // const token = jwt.sign({ userId: user._id }, "your_jwt_secret", {
+    //   expiresIn: "1h",
+    // });
 
     res.status(200).json({
       message: "Login successful",
       success: true,
-      token,
       data: {
         username: username,
         email: email,
