@@ -72,27 +72,32 @@ const registerUser = async (req, res) => {
 };
 
 const loginUser = async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, password } = req.body;
 
-  if (!username || !email || !password) {
+  if (!username || !password) {
     return res.status(400).json({
-      message: "username, email and password are required",
+      message: "Username or email and password are required",
       success: false,
     });
   }
 
   try {
-    let user;
     const emailRegex = /\S+@\S+\.\S+/;
-    if (emailRegex.test(email)) {
-      user = await UserAuth.findOne({ email: email });
+    let user;
+
+    if (emailRegex.test(username)) {
+      user = await UserAuth.findOne({ email: username });
+    } else {
+      user = await UserAuth.findOne({ username: username });
     }
 
     if (!user) {
-      return res.status(400).json({ message: "Invalid email", success: false });
+      return res
+        .status(400)
+        .json({ message: "Invalid username or email", success: false });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    // const isMatch = await bcrypt.compare(password, user.password);
 
     if (!password) {
       return res
@@ -100,6 +105,7 @@ const loginUser = async (req, res) => {
         .json({ message: "Invalid password", success: false });
     }
 
+    // Optional: generate JWT token
     // const token = jwt.sign({ userId: user._id }, "your_jwt_secret", {
     //   expiresIn: "1h",
     // });
@@ -108,11 +114,13 @@ const loginUser = async (req, res) => {
       message: "Login successful",
       success: true,
       data: {
-        username: username,
-        email: email,
-        password: password,
+        id: user._id,
+        username: user.username,
+        email: user.email,
         role: user.role,
         phone: user.phone,
+        createdAt: user.createdAt,
+        // token: token
       },
     });
   } catch (err) {
