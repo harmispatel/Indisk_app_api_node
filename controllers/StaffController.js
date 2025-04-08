@@ -1,25 +1,25 @@
-const ManagerAuth = require("../models/manager");
+const StaffData = require("../models/staff");
 const bcrypt = require("bcryptjs");
 
-const getManager = async (req, res) => {
+const getStaff = async (req, res) => {
   try {
-    const managers = await ManagerAuth.find();
+    const staffData = await StaffData.find();
 
     return res.status(200).json({
       success: true,
-      message: "Manager list fetched successfully",
-      data: managers,
+      message: "Staff list fetched successfully",
+      data: staffData,
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Error fetching managers.",
+      message: "Error fetching staff list",
       error: error.message,
     });
   }
 };
 
-const createManager = async (req, res) => {
+const createStaff = async (req, res) => {
   try {
     const {
       name,
@@ -60,7 +60,7 @@ const createManager = async (req, res) => {
       });
     }
 
-    const existingUser = await ManagerAuth.findOne({
+    const existingUser = await StaffData.findOne({
       $or: [{ username }, { email }],
     });
 
@@ -76,7 +76,7 @@ const createManager = async (req, res) => {
     const defaultPhoto = "https://example.com/default-profile.jpg";
     const finalProfilePhoto = profile_photo?.trim() || defaultPhoto;
 
-    const newManager = new ManagerAuth({
+    const newStaff = new StaffData({
       name: name.trim(),
       username: username.trim(),
       phone: phone.trim(),
@@ -86,18 +86,18 @@ const createManager = async (req, res) => {
       is_blocked,
     });
 
-    await newManager.save();
+    await newStaff.save();
 
-    const managerData = newManager.toObject();
-    delete managerData.password;
+    const staffData = newStaff.toObject();
+    delete staffData.password;
 
     return res.status(201).json({
       success: true,
-      message: "Manager created successfully",
-      manager: managerData,
+      message: "Staff created successfully",
+      staff: staffData,
     });
   } catch (error) {
-    console.error("Error creating manager:", error.message);
+    console.error("Error creating staff:", error.message);
 
     return res.status(500).json({
       success: false,
@@ -107,7 +107,7 @@ const createManager = async (req, res) => {
   }
 };
 
-const updateManager = async (req, res) => {
+const updateStaff = async (req, res) => {
   try {
     const {
       id,
@@ -120,11 +120,11 @@ const updateManager = async (req, res) => {
       is_blocked,
     } = req.body;
 
-    const existingManager = await ManagerAuth.findById(id);
-    if (!existingManager) {
+    const existingStaff = await StaffData.findById(id);
+    if (!existingStaff) {
       return res.status(404).json({
         success: false,
-        message: "Manager not found",
+        message: "Staff not found",
       });
     }
 
@@ -156,7 +156,7 @@ const updateManager = async (req, res) => {
       });
     }
 
-    const duplicate = await ManagerAuth.findOne({
+    const duplicate = await StaffData.findOne({
       _id: { $ne: id },
       $or: [{ email }, { username }],
     });
@@ -168,12 +168,12 @@ const updateManager = async (req, res) => {
       });
     }
 
-    let updatedPassword = existingManager.password;
+    let updatedPassword = existingStaff.password;
     if (password && password.trim()) {
       updatedPassword = await bcrypt.hash(password.trim(), 10);
     }
 
-    const updatedManager = await ManagerAuth.findByIdAndUpdate(
+    const updatedStaff = await StaffData.findByIdAndUpdate(
       id,
       {
         name: name.trim(),
@@ -181,22 +181,22 @@ const updateManager = async (req, res) => {
         phone: phone.trim(),
         email: email.trim().toLowerCase(),
         password: updatedPassword,
-        profile_photo: profile_photo?.trim() || existingManager.profile_photo,
+        profile_photo: profile_photo?.trim() || existingStaff.profile_photo,
         is_blocked,
       },
       { new: true }
     );
 
-    const managerData = updatedManager.toObject();
-    delete managerData.password;
+    const staffData = updatedStaff.toObject();
+    delete staffData.password;
 
     return res.status(200).json({
       success: true,
-      message: "Manager updated successfully",
-      manager: managerData,
+      message: "Staff updated successfully",
+      manager: staffData,
     });
   } catch (error) {
-    console.error("Error updating manager:", error.message);
+    console.error("Error updating staff:", error.message);
     return res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -205,7 +205,7 @@ const updateManager = async (req, res) => {
   }
 };
 
-const deleteManager = async (req, res) => {
+const deleteStaff = async (req, res) => {
   try {
     const { id } = req.body;
 
@@ -216,26 +216,31 @@ const deleteManager = async (req, res) => {
       });
     }
 
-    const manager = await ManagerAuth.findByIdAndDelete(id);
+    const staffData = await StaffData.findByIdAndDelete(id);
 
-    if (!manager) {
+    if (!staffData) {
       return res.status(404).json({
         success: false,
-        message: "Manager not found",
+        message: "Staff not found",
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "Manager deleted successfully",
+      message: "Staff deleted successfully",
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Failed to delete manager!",
+      message: "Failed to delete staff!",
       error: error.message,
     });
   }
 };
 
-module.exports = { getManager, createManager, updateManager, deleteManager };
+module.exports = {
+  getStaff,
+  createStaff,
+  updateStaff,
+  deleteStaff,
+};
