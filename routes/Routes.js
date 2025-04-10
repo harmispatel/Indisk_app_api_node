@@ -1,5 +1,9 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
+const upload = multer();
+const { uploadManager, uploadStaff } = require("../middlewares/upload");
+
 
 const {
   getAuthUsers,
@@ -24,19 +28,19 @@ const {
 } = require("../controllers/StaffController");
 
 router.get("/auth-user-list", getAuthUsers);
-router.post("/login", loginUser);
-router.post("/signup", registerUser);
-router.post("/forgot-password", forgotPassword);
-router.post("/reset-password", resetPassword);
+router.post("/login", upload.none(), loginUser);
+router.post("/signup", upload.none(), registerUser);
+router.post("/forgot-password", upload.none(), forgotPassword);
+router.post("/reset-password", upload.none(), resetPassword);
 
 router.get("/manager-list", getManager);
-router.post("/create-manager", createManager);
-router.put("/update-manager", updateManager);
-router.delete("/delete-manager", deleteManager);
+router.post("/create-manager", uploadManager.single("profile_photo"), createManager);
+router.put("/update-manager", uploadManager.single("profile_photo"),updateManager);
+router.delete("/delete-manager",upload.none(), deleteManager);
 
 router.get("/staff-list", getStaff);
-router.post("/create-staff", createStaff);
-router.put("/update-staff", updateStaff);
-router.delete("/delete-staff", deleteStaff);
+router.post("/create-staff",uploadStaff.single("profile_photo"), createStaff);
+router.put("/update-staff",uploadStaff.single("profile_photo"), updateStaff);
+router.delete("/delete-staff",upload.none(), deleteStaff);
 
 module.exports = router;

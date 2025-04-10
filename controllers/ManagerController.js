@@ -1,5 +1,7 @@
 const ManagerAuth = require("../models/manager");
 const bcrypt = require("bcryptjs");
+const fs = require("fs");
+const path = require("path");
 
 const getManager = async (req, res) => {
   try {
@@ -21,15 +23,9 @@ const getManager = async (req, res) => {
 
 const createManager = async (req, res) => {
   try {
-    const {
-      name,
-      username,
-      phone,
-      email,
-      password,
-      profile_photo,
-      is_blocked,
-    } = req.body;
+    const { name, username, phone, email, password, is_blocked } = req.body;
+
+    const profile_photo = req.file ? req.file.filename : null;
 
     if (
       !name?.trim() ||
@@ -37,6 +33,7 @@ const createManager = async (req, res) => {
       !phone?.trim() ||
       !email?.trim() ||
       !password?.trim() ||
+      !profile_photo ||
       is_blocked === undefined
     ) {
       return res.status(400).json({
@@ -73,23 +70,20 @@ const createManager = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const defaultPhoto = "https://example.com/default-profile.jpg";
-    const finalProfilePhoto = profile_photo?.trim() || defaultPhoto;
-
     const newManager = new ManagerAuth({
       name: name.trim(),
       username: username.trim(),
       phone: phone.trim(),
       email: email.trim().toLowerCase(),
       password: hashedPassword,
-      profile_photo: finalProfilePhoto,
+      profile_photo: `${process.env.FRONTEND_URL}/uploads/managers/${profile_photo}`,
       is_blocked,
     });
 
     await newManager.save();
 
     const managerData = newManager.toObject();
-    delete managerData.password;
+    // delete managerData.password;
 
     return res.status(201).json({
       success: true,
@@ -109,16 +103,7 @@ const createManager = async (req, res) => {
 
 const updateManager = async (req, res) => {
   try {
-    const {
-      id,
-      name,
-      username,
-      phone,
-      email,
-      password,
-      profile_photo,
-      is_blocked,
-    } = req.body;
+    const { id, name, username, phone, email, password, is_blocked } = req.body;
 
     const existingManager = await ManagerAuth.findById(id);
     if (!existingManager) {
@@ -128,11 +113,28 @@ const updateManager = async (req, res) => {
       });
     }
 
+    let profile_photo = existingManager.profile_photo;
+    if (req.file) {
+      const oldFileName = path.basename(existingManager.profile_photo || "");
+      const oldFilePath = path.join(
+        __dirname,
+        "../uploads/managers",
+        oldFileName
+      );
+
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath); // remove old image
+      }
+
+      profile_photo = `${process.env.FRONTEND_URL}/uploads/managers/${req.file.filename}`;
+    }
+
     if (
       !name?.trim() ||
       !username?.trim() ||
       !phone?.trim() ||
       !email?.trim() ||
+      !profile_photo ||
       is_blocked === undefined
     ) {
       return res.status(400).json({
@@ -181,14 +183,13 @@ const updateManager = async (req, res) => {
         phone: phone.trim(),
         email: email.trim().toLowerCase(),
         password: updatedPassword,
-        profile_photo: profile_photo?.trim() || existingManager.profile_photo,
+        profile_photo,
         is_blocked,
       },
       { new: true }
     );
 
     const managerData = updatedManager.toObject();
-    delete managerData.password;
 
     return res.status(200).json({
       success: true,
@@ -216,14 +217,23 @@ const deleteManager = async (req, res) => {
       });
     }
 
-    const manager = await ManagerAuth.findByIdAndDelete(id);
-
+    const manager = await ManagerAuth.findById(id);
     if (!manager) {
       return res.status(404).json({
         success: false,
         message: "Manager not found",
       });
     }
+
+    if (manager.profile_photo) {
+      const fileName = path.basename(manager.profile_photo);
+      const filePath = path.join(__dirname, "../uploads/managers", fileName);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    await ManagerAuth.findByIdAndDelete(id);
 
     return res.status(200).json({
       success: true,

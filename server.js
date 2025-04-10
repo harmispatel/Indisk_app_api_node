@@ -5,6 +5,7 @@ const routes = require("./routes/Routes");
 const errorMiddleware = require("./middlewares/errorMiddleware");
 const cors = require("cors");
 const NodeCache = require("node-cache");
+const path = require("path");
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ app.delete("/api/cache/clear", (req, res) => {
 });
 
 app.use("/api", routes);
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use(errorMiddleware);
 

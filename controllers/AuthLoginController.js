@@ -97,31 +97,17 @@ const loginUser = async (req, res) => {
         .json({ message: "Invalid username or email", success: false });
     }
 
-    // const isMatch = await bcrypt.compare(password, user.password);
-
     if (!password) {
       return res
         .status(400)
         .json({ message: "Invalid password", success: false });
     }
 
-    // Optional: generate JWT token
-    // const token = jwt.sign({ userId: user._id }, "your_jwt_secret", {
-    //   expiresIn: "1h",
-    // });
-
     res.status(200).json({
       message: "Login successful",
       success: true,
-      data: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        createdAt: user.createdAt,
-        // token: token
-      },
+      data: user,
+      restaurant_details: null,
     });
   } catch (err) {
     console.error(err);

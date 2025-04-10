@@ -1,5 +1,7 @@
 const StaffData = require("../models/staff");
 const bcrypt = require("bcryptjs");
+const fs = require("fs");
+const path = require("path");
 
 const getStaff = async (req, res) => {
   try {
@@ -21,15 +23,9 @@ const getStaff = async (req, res) => {
 
 const createStaff = async (req, res) => {
   try {
-    const {
-      name,
-      username,
-      phone,
-      email,
-      password,
-      profile_photo,
-      is_blocked,
-    } = req.body;
+    const { name, username, phone, email, password, is_blocked } = req.body;
+
+    const profile_photo = req.file ? req.file.filename : null;
 
     if (
       !name?.trim() ||
@@ -73,23 +69,20 @@ const createStaff = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const defaultPhoto = "https://example.com/default-profile.jpg";
-    const finalProfilePhoto = profile_photo?.trim() || defaultPhoto;
-
     const newStaff = new StaffData({
       name: name.trim(),
       username: username.trim(),
       phone: phone.trim(),
       email: email.trim().toLowerCase(),
       password: hashedPassword,
-      profile_photo: finalProfilePhoto,
+      profile_photo: `${process.env.FRONTEND_URL}/uploads/staffs/${profile_photo}`,
       is_blocked,
     });
 
     await newStaff.save();
 
     const staffData = newStaff.toObject();
-    delete staffData.password;
+    // delete staffData.password;
 
     return res.status(201).json({
       success: true,
@@ -109,16 +102,18 @@ const createStaff = async (req, res) => {
 
 const updateStaff = async (req, res) => {
   try {
-    const {
-      id,
-      name,
-      username,
-      phone,
-      email,
-      password,
-      profile_photo,
-      is_blocked,
-    } = req.body;
+    const { id, name, username, phone, email, password, is_blocked } = req.body;
+
+    // const profile_photo = req.file
+    //   ? `${process.env.FRONTEND_URL}/uploads/staffs/${req.file.filename}`
+    //   : null;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "ID is missing",
+      });
+    }
 
     const existingStaff = await StaffData.findById(id);
     if (!existingStaff) {
@@ -128,11 +123,28 @@ const updateStaff = async (req, res) => {
       });
     }
 
+    let profile_photo = existingStaff.profile_photo;
+    if (req.file) {
+      const oldFileName = path.basename(existingStaff.profile_photo);
+
+      const oldFilePath = path.join(
+        __dirname,
+        "../uploads/staffs",
+        oldFileName
+      );
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+      }
+
+      profile_photo = `${process.env.FRONTEND_URL}/uploads/staffs/${req.file.filename}`;
+    }
+
     if (
       !name?.trim() ||
       !username?.trim() ||
       !phone?.trim() ||
       !email?.trim() ||
+      !profile_photo ||
       is_blocked === undefined
     ) {
       return res.status(400).json({
@@ -181,14 +193,14 @@ const updateStaff = async (req, res) => {
         phone: phone.trim(),
         email: email.trim().toLowerCase(),
         password: updatedPassword,
-        profile_photo: profile_photo?.trim() || existingStaff.profile_photo,
+        profile_photo: profile_photo,
         is_blocked,
       },
       { new: true }
     );
 
     const staffData = updatedStaff.toObject();
-    delete staffData.password;
+    // delete staffData.password;
 
     return res.status(200).json({
       success: true,
