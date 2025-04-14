@@ -45,6 +45,13 @@ const {
   deleteStaffData,
 } = require("../controllers/StaffListController");
 
+const {
+  getFoodCategory,
+  createFoodCategory,
+  updateFoodCategory,
+  deleteFoodCategory,
+} = require("../controllers/FoodCategoryController");
+
 router.get("/auth-user-list", getAuthUsers);
 router.post("/login", upload.none(), loginUser);
 router.post("/signup", upload.none(), registerUser);
@@ -94,5 +101,18 @@ router.put(
   updateStaffData
 );
 router.delete("/staff/staff-delete", upload.none(), deleteStaffData);
+
+router.get("/food-category-list", getFoodCategory);
+router.post(
+  "/create-food-category",
+  upload.single("image_url"),
+  createFoodCategory
+);
+router.put(
+  "/update-food-category",
+  upload.single("image_url"),
+  updateFoodCategory
+);
+router.delete("/delete-food-category", upload.none(), deleteFoodCategory);
 
 module.exports = router;
