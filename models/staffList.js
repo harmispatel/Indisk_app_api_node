@@ -44,6 +44,16 @@ const StaffListData = mongoose.model(
       required: true,
       enum: [1, 2],
     },
+    restaurant_id: {
+      required: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "restaurant",
+    },
+    created_by: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "login",
+      required: true,
+    },
     createdAt: { type: Date, default: Date.now },
   })
 );

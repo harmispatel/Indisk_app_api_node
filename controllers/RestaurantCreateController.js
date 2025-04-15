@@ -1,10 +1,11 @@
 const Restaurant = require("../models/RestaurantCreate");
+const UserAuth = require("../models/authLogin");
 
 const getRestaurant = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { user_id } = req.body;
 
-    const restaurants = await Restaurant.find({ user_id: id });
+    const restaurants = await Restaurant.find({ user_id: user_id });
 
     res.status(200).json({
       message: "Restaurants fetched successfully",
@@ -21,8 +22,8 @@ const getRestaurant = async (req, res) => {
 };
 
 const createRestaurant = async (req, res) => {
-  const { id } = req.params;
   const {
+    user_id,
     restaurant_name,
     email,
     contact,
@@ -43,6 +44,14 @@ const createRestaurant = async (req, res) => {
   ) {
     return res.status(400).json({
       message: "Please provide restaurant_name, email, contact, logo, isActive",
+      success: false,
+    });
+  }
+
+  const exitsUser = await UserAuth.findOne({ user_id });
+  if (exitsUser) {
+    return res.status(400).json({
+      message: "User not found!",
       success: false,
     });
   }
@@ -73,7 +82,7 @@ const createRestaurant = async (req, res) => {
       tagLine,
       isActive,
       website_link,
-      user_id: id,
+      user_id: user_id,
     });
 
     await newRestaurant.save();
@@ -93,35 +102,42 @@ const createRestaurant = async (req, res) => {
 };
 
 const updateRestaurant = async (req, res) => {
-  const { user_id } = req.params;
-
-  const {
-    id,
-    restaurant_name,
-    email,
-    contact,
-    description,
-    tagLine,
-    website_link,
-    isActive,
-  } = req.body;
-
-  const logo = req.file
-    ? `${process.env.FRONTEND_URL}/uploads/${req.file.filename}`
-    : null;
-
-  if (!id || !restaurant_name || !email || !contact || isActive === undefined) {
-    return res.status(400).json({
-      message: "Please provide id, restaurant_name, email, contact, isActive",
-      success: false,
-    });
-  }
-
   try {
-    const restaurant = await Restaurant.findOne({ user_id });
+    const {
+      user_id,
+      id,
+      restaurant_name,
+      email,
+      contact,
+      description,
+      tagLine,
+      website_link,
+      isActive,
+    } = req.body;
+
+    const logo = req.file
+      ? `${process.env.FRONTEND_URL}/uploads/${req.file.filename}`
+      : null;
+
+    if (!id || !user_id) {
+      return res.status(400).json({
+        message: "Both admin ID and user_id are required",
+        success: false,
+      });
+    }
+
+    if (!restaurant_name || !email || !contact || isActive === undefined) {
+      return res.status(400).json({
+        message: "Please provide restaurant_name, email, contact, isActive",
+        success: false,
+      });
+    }
+
+    const restaurant = await Restaurant.findOne({ _id: id, user_id });
+
     if (!restaurant) {
       return res.status(404).json({
-        message: "Restaurant not found for this user",
+        message: "Restaurant not found with this ID and user_id",
         success: false,
       });
     }
@@ -211,17 +227,34 @@ const updateRestaurant = async (req, res) => {
 };
 
 const deleteRestaurant = async (req, res) => {
-  const { user_id } = req.params;
-
   try {
-    const restaurant = await Restaurant.findOneAndDelete({ user_id });
+    const { id, user_id } = req.body;
+
+    if (!id || !user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Both ID and user_id are required",
+      });
+    }
+
+    const restaurant = await Restaurant.findOne({ _id: id, user_id });
 
     if (!restaurant) {
       return res.status(404).json({
-        message: "Restaurant not found for this user",
+        message: "Restaurant not found for the given user_id",
         success: false,
       });
     }
+
+    if (restaurant.image) {
+      const fileName = path.basename(restaurant.image);
+      const filePath = path.join(__dirname, "../uploads", fileName);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    await Restaurant.findByIdAndDelete(id);
 
     res.status(200).json({
       message: "Restaurant deleted successfully",

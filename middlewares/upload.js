@@ -60,15 +60,16 @@ const uploadStaffs = multer({
     fileSize: 5 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
-    if (
-      file.mimetype === "image/jpeg" ||
-      file.mimetype === "image/png" ||
-      file.mimetype === "image/webp"
-    ) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only image files (jpg, png, webp) are allowed!"));
-    }
+    // if (
+    //   file.mimetype === "image/jpeg" ||
+    //   file.mimetype === "image/png" ||
+    //   file.mimetype === "image/webp"
+    // ) {
+    //   cb(null, true);
+    // } else {
+    //   cb(new Error("Only image files (jpg, png, webp) are allowed!"));
+    // }
+    cb(null, true);
   },
 });
 

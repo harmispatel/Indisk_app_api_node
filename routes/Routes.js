@@ -52,6 +52,12 @@ const {
   deleteFoodCategory,
 } = require("../controllers/FoodCategoryController");
 
+const {
+  getFood,
+  createFood,
+  deleteFood,
+} = require("../controllers/FoodItemController");
+
 router.get("/auth-user-list", getAuthUsers);
 router.post("/login", upload.none(), loginUser);
 router.post("/signup", upload.none(), registerUser);
@@ -76,18 +82,18 @@ router.post("/create-staff", uploadStaff.single("profile_photo"), createStaff);
 router.put("/update-staff", uploadStaff.single("profile_photo"), updateStaff);
 router.delete("/delete-staff", upload.none(), deleteStaff);
 
-router.get("/restaurant-list/:id", getRestaurant);
+router.get("/restaurant-list", upload.none(), getRestaurant);
 router.post(
-  "/restaurant-create/:id",
+  "/restaurant-create",
   uploadRestaurant.single("logo"),
   createRestaurant
 );
 router.put(
-  "/restaurant-update/:user_id",
+  "/restaurant-update",
   uploadRestaurant.single("logo"),
   updateRestaurant
 );
-router.delete("/restaurant-delete/:user_id", deleteRestaurant);
+router.delete("/restaurant-delete", upload.none(), deleteRestaurant);
 
 router.get("/staff/staff-list", getStaffList);
 router.post(
@@ -114,5 +120,9 @@ router.put(
   updateFoodCategory
 );
 router.delete("/delete-food-category", upload.none(), deleteFoodCategory);
+
+router.get("/get-food-list", upload.none(), getFood);
+router.post("/create-food", upload.array("image", 5), createFood);
+router.delete("/delete-food", upload.none(), deleteFood);
 
 module.exports = router;

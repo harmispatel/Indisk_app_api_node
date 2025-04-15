@@ -1,6 +1,8 @@
 const StaffListData = require("../models/staffList");
 const fs = require("fs");
 const path = require("path");
+const Restaurant = require("../models/RestaurantCreate");
+const UserAuth = require("../models/authLogin");
 
 const roleMap = {
   1: "Manager",
@@ -9,7 +11,7 @@ const roleMap = {
 
 const getStaffList = async (req, res) => {
   try {
-    const role = req.query.role; // get role from query ?role=1
+    const role = req.query.role;
 
     if (role && !roleMap[parseInt(role)]) {
       return res.status(400).json({
@@ -50,8 +52,17 @@ const getStaffList = async (req, res) => {
 
 const createStaffData = async (req, res) => {
   try {
-    const { name, username, phone, email, password, is_blocked, role } =
-      req.body;
+    const {
+      name,
+      username,
+      phone,
+      email,
+      password,
+      is_blocked,
+      role,
+      restaurant_id,
+      created_by,
+    } = req.body;
 
     if (
       !name ||
@@ -61,6 +72,8 @@ const createStaffData = async (req, res) => {
       !password ||
       !is_blocked ||
       role === undefined ||
+      !created_by ||
+      !restaurant_id ||
       !req.file
     ) {
       return res.status(400).json({
@@ -115,6 +128,22 @@ const createStaffData = async (req, res) => {
     const filePath = path.join(uploadDir, fileName);
     fs.writeFileSync(filePath, req.file.buffer);
 
+    const restaurantExists = await Restaurant.findById(restaurant_id);
+    if (!restaurantExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Restaurant not found",
+      });
+    }
+
+    const userExists = await UserAuth.findById(created_by);
+    if (!userExists) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
     const newStaff = new StaffListData({
       name,
       username,
@@ -124,6 +153,8 @@ const createStaffData = async (req, res) => {
       image: `${process.env.FRONTEND_URL}/assets/uploads/${fileName}`,
       is_blocked,
       role: parsedRole,
+      restaurant_id,
+      created_by,
     });
 
     await newStaff.save();
@@ -135,6 +166,7 @@ const createStaffData = async (req, res) => {
         ...newStaff.toObject(),
         role_name: roleMap[parsedRole],
       },
+      restaurant_details: restaurantExists || null,
     });
   } catch (error) {
     return res.status(500).json({
@@ -147,12 +179,33 @@ const createStaffData = async (req, res) => {
 
 const updateStaffData = async (req, res) => {
   try {
-    const { id, name, username, phone, email, password, is_blocked } = req.body;
+    const {
+      id,
+      name,
+      username,
+      phone,
+      email,
+      password,
+      is_blocked,
+      role,
+      restaurant_id,
+      created_by,
+    } = req.body;
 
-    if (!id) {
+    if (
+      !id ||
+      !name ||
+      !username ||
+      !phone ||
+      !email ||
+      !is_blocked ||
+      role === undefined ||
+      !restaurant_id ||
+      !created_by
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Staff ID is required",
+        message: "All fields are required.",
       });
     }
 
@@ -164,16 +217,11 @@ const updateStaffData = async (req, res) => {
       });
     }
 
-    if (
-      !name?.trim() ||
-      !username?.trim() ||
-      !phone?.trim() ||
-      !email?.trim() ||
-      typeof is_blocked === "undefined"
-    ) {
+    const parsedRole = parseInt(role);
+    if (!roleMap[parsedRole]) {
       return res.status(400).json({
         success: false,
-        message: "Name, username, phone, email, and is_blocked are required",
+        message: "Invalid role. Role not found.",
       });
     }
 
@@ -194,19 +242,35 @@ const updateStaffData = async (req, res) => {
 
     const duplicate = await StaffListData.findOne({
       _id: { $ne: id },
-      $or: [{ email }, { username }],
+      $or: [{ email }, { username }, { phone }],
     });
 
     if (duplicate) {
       return res.status(409).json({
         success: false,
-        message: "Email or username already in use by another user",
+        message: "Email, phone or username already in use by another user",
+      });
+    }
+
+    const restaurantExists = await Restaurant.findById(restaurant_id);
+    if (!restaurantExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Restaurant not found",
+      });
+    }
+
+    const userExists = await UserAuth.findById(created_by);
+    if (!userExists) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
     }
 
     let image = existingStaff.image;
     if (req.file) {
-      const oldImageFile = existingStaff.image
+      const oldImagePath = existingStaff.image
         ? path.join(
             __dirname,
             "../assets/uploads",
@@ -214,8 +278,8 @@ const updateStaffData = async (req, res) => {
           )
         : null;
 
-      if (oldImageFile && fs.existsSync(oldImageFile)) {
-        fs.unlinkSync(oldImageFile);
+      if (oldImagePath && fs.existsSync(oldImagePath)) {
+        fs.unlinkSync(oldImagePath);
       }
 
       const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
@@ -235,7 +299,7 @@ const updateStaffData = async (req, res) => {
 
     let updatedPassword = existingStaff.password;
     if (password && password.trim()) {
-      // updatedPassword = await bcrypt.hash(password.trim(), 10); // Uncomment for hashing
+      // updatedPassword = await bcrypt.hash(password.trim(), 10); // Uncomment if using hashing
       updatedPassword = password.trim();
     }
 
@@ -249,20 +313,27 @@ const updateStaffData = async (req, res) => {
         password: updatedPassword,
         image,
         is_blocked,
+        role: parsedRole,
+        restaurant_id,
+        created_by,
       },
       { new: true }
     );
 
     return res.status(200).json({
       success: true,
-      message: "Staff data updated successfully",
-      manager: updatedStaff.toObject(),
+      message: `${roleMap[parsedRole]} updated successfully`,
+      data: {
+        ...updatedStaff.toObject(),
+        role_name: roleMap[parsedRole],
+      },
+      restaurant_details: restaurantExists || null,
     });
   } catch (error) {
     console.error("Error updating staff data:", error.message);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Error updating staff",
       error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
