@@ -6,7 +6,7 @@ const Restaurant = require("../models/RestaurantCreate");
 
 const getFoodCategory = async (req, res) => {
   try {
-    const { restaurant_id } = req.body;
+    const { restaurant_id } = req.query;
 
     const existingRestaurant = await Restaurant.findById(restaurant_id);
     if (!existingRestaurant) {

@@ -108,7 +108,7 @@ router.put(
 );
 router.delete("/staff/staff-delete", upload.none(), deleteStaffData);
 
-router.get("/food-category-list", upload.none(), getFoodCategory);
+router.get("/food-category-list", getFoodCategory);
 router.post(
   "/create-food-category",
   upload.single("image_url"),
