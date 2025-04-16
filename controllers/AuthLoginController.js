@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const Restaurant = require("../models/RestaurantCreate");
+const StaffListData = require("../models/staffList");
 
 const getAuthUsers = async (req, res) => {
   try {
@@ -85,11 +86,22 @@ const loginUser = async (req, res) => {
   try {
     const emailRegex = /\S+@\S+\.\S+/;
     let user;
+    let userType = null;
 
     if (emailRegex.test(username)) {
       user = await UserAuth.findOne({ email: username });
+      userType = "UserAuth";
+      if (!user) {
+        user = await StaffListData.findOne({ email: username });
+        userType = "StaffListData";
+      }
     } else {
       user = await UserAuth.findOne({ username: username });
+      userType = "UserAuth";
+      if (!user) {
+        user = await StaffListData.findOne({ username: username });
+        userType = "StaffListData";
+      }
     }
 
     if (!user) {
@@ -98,18 +110,22 @@ const loginUser = async (req, res) => {
         .json({ message: "Invalid username or email", success: false });
     }
 
-    if (!password) {
+    if (user.password !== password) {
       return res
         .status(400)
         .json({ message: "Invalid password", success: false });
     }
 
-    const restaurantData = await Restaurant.findOne({ user_id: user._id });
+    const restaurantData =
+      userType === "StaffListData"
+        ? await Restaurant.findOne({ _id: user.restaurant_id })
+        : await Restaurant.findOne({ user_id: user._id });
 
     res.status(200).json({
       message: "Login successful",
       success: true,
       data: user,
+      user_type: userType,
       restaurant_details: restaurantData || null,
     });
   } catch (err) {

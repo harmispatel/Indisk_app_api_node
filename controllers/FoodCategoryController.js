@@ -2,10 +2,21 @@ const foodCategorySchema = require("../models/foodCategory");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
+const Restaurant = require("../models/RestaurantCreate");
 
 const getFoodCategory = async (req, res) => {
   try {
-    const foodCategoryData = await foodCategorySchema.find();
+    const { restaurant_id } = req.body;
+
+    const existingRestaurant = await Restaurant.findById(restaurant_id);
+    if (!existingRestaurant) {
+      return res.status(404).json({
+        message: "Restaurant not found",
+        success: false,
+      });
+    }
+
+    const foodCategoryData = await foodCategorySchema.find({ restaurant_id });
     res.status(200).json({
       message: "Food categories fetched successfully",
       success: true,
@@ -24,9 +35,9 @@ const createFoodCategory = async (req, res) => {
   try {
     const { name, description, restaurant_id, is_active } = req.body;
 
-    if (!name || !restaurant_id || is_active === undefined || !req.file) {
+    if (!name || !restaurant_id || !req.file) {
       return res.status(400).json({
-        message: "Please provide name, restaurant_id, is_active and image file",
+        message: "Please provide name, restaurant_id and image file",
         success: false,
       });
     }
@@ -82,7 +93,6 @@ const updateFoodCategory = async (req, res) => {
       !name &&
       !restaurant_id &&
       !description &&
-      is_active === undefined &&
       !req.file
     ) {
       return res.status(400).json({
@@ -103,7 +113,7 @@ const updateFoodCategory = async (req, res) => {
     if (description !== undefined) foodCategoryGet.description = description;
     if (restaurant_id !== undefined)
       foodCategoryGet.restaurant_id = restaurant_id;
-    if (is_active !== undefined) foodCategoryGet.is_active = is_active;
+    if (is_active) foodCategoryGet.is_active = is_active;
 
     if (req.file) {
       const oldFileName = path.basename(foodCategoryGet.image_url || "");

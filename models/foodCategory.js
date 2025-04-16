@@ -22,7 +22,7 @@ const foodCategorySchema = new mongoose.Schema(
       default: "",
     },
     is_active: {
-      type: Boolean,
+      type: String,
       default: true,
     },
   },
