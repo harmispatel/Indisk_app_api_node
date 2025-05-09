@@ -4,6 +4,8 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
+const config = require("../config/nodemailer");
+const nodemailer = require("nodemailer");
 
 const getRestaurant = async (req, res) => {
   try {
@@ -106,6 +108,42 @@ const createRestaurant = async (req, res) => {
     });
 
     await newRestaurant.save();
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: {
+        user: config.emailUser,
+        pass: config.emailPassword,
+      },
+    });
+
+    const mailOptions = {
+      from: config.emailUser,
+      to: email,
+      subject: "Your Restaurant Login Credentials",
+      html: `
+        <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+          <h3>Welcome to Our Platform!</h3>
+          <p>Your restaurant account has been successfully created. Below are your login credentials:</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Password:</strong> ${password}</p>
+          <p>We recommend changing your password after logging in for the first time.</p>
+          <br />
+          <p>Best regards,<br />The Team</p>
+        </div>
+      `,
+    };
+
+    transporter.sendMail(mailOptions, function (error) {
+      if (error) {
+        console.log(error);
+      } else {
+        console.log("Mail has been sent to your email");
+      }
+    });
 
     res.status(201).json({
       message: "Restaurant created successfully",
