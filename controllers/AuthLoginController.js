@@ -3,7 +3,6 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
-const Restaurant = require("../models/RestaurantCreate");
 const StaffListData = require("../models/staffList");
 
 const getAuthUsers = async (req, res) => {
@@ -116,17 +115,10 @@ const loginUser = async (req, res) => {
         .json({ message: "Invalid password", success: false });
     }
 
-    const restaurantData =
-      userType === "StaffListData"
-        ? await Restaurant.findOne({ _id: user.restaurant_id })
-        : await Restaurant.findOne({ user_id: user._id });
-
     res.status(200).json({
       message: "Login successful",
       success: true,
       data: user,
-      user_type: userType,
-      restaurant_details: restaurantData || null,
     });
   } catch (err) {
     console.error(err);

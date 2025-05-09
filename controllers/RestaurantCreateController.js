@@ -1,11 +1,15 @@
 const Restaurant = require("../models/RestaurantCreate");
 const UserAuth = require("../models/authLogin");
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+require("dotenv").config();
 
 const getRestaurant = async (req, res) => {
   try {
-    const { user_id } = req.body;
+    const { owner_id } = req.body;
 
-    const restaurants = await Restaurant.find({ user_id: user_id });
+    const restaurants = await Restaurant.find({ owner_id: owner_id });
 
     res.status(200).json({
       message: "Restaurants fetched successfully",
@@ -22,41 +26,45 @@ const getRestaurant = async (req, res) => {
 };
 
 const createRestaurant = async (req, res) => {
-  const {
-    user_id,
-    restaurant_name,
-    email,
-    contact,
-    description,
-    tagLine,
-    isActive,
-    website_link,
-  } = req.body;
-
-  const logo = req.file ? req.file.filename : null;
-
-  if (
-    !restaurant_name ||
-    !email ||
-    !contact ||
-    !logo ||
-    isActive === undefined
-  ) {
-    return res.status(400).json({
-      message: "Please provide restaurant_name, email, contact, logo, isActive",
-      success: false,
-    });
-  }
-
-  const exitsUser = await UserAuth.findOne({ user_id });
-  if (exitsUser) {
-    return res.status(400).json({
-      message: "User not found!",
-      success: false,
-    });
-  }
-
   try {
+    const {
+      owner_id,
+      email,
+      password,
+      phone,
+      name,
+      address,
+      opening_hours,
+      status,
+      description,
+      location,
+      cuisine_type,
+    } = req.body;
+
+    if (
+      !owner_id ||
+      !name ||
+      !email ||
+      !phone ||
+      !req.file ||
+      !address ||
+      status === undefined
+    ) {
+      return res.status(400).json({
+        message:
+          "Missing required fields:owner_id, name, email, phone, image, address or status",
+        success: false,
+      });
+    }
+
+    const ownerExists = await UserAuth.findOne({ _id: owner_id });
+    if (!ownerExists) {
+      return res.status(400).json({
+        message: "Owner not found!",
+        success: false,
+      });
+    }
+
     const emailExists = await Restaurant.findOne({ email });
     if (emailExists) {
       return res.status(400).json({
@@ -65,24 +73,38 @@ const createRestaurant = async (req, res) => {
       });
     }
 
-    const contactExists = await Restaurant.findOne({ contact });
-    if (contactExists) {
+    const phoneExists = await Restaurant.findOne({ phone });
+    if (phoneExists) {
       return res.status(400).json({
-        message: "Restaurant with this contact already exists",
+        message: "Restaurant with this phone number already exists",
         success: false,
       });
     }
 
+    const uniqueName = crypto.randomBytes(2).toString("hex");
+    const fileName = `${uniqueName}${path.extname(req.file.originalname)}`;
+    const uploadDir = path.join(__dirname, "../assets/restaurant");
+
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filePath = path.join(uploadDir, fileName);
+    fs.writeFileSync(filePath, req.file.buffer);
+
     const newRestaurant = new Restaurant({
-      restaurant_name,
+      owner_id,
       email,
-      contact,
-      logo: `${process.env.FRONTEND_URL}/uploads/${logo}`,
-      description,
-      tagLine,
-      isActive,
-      website_link,
-      user_id: user_id,
+      password,
+      phone,
+      name,
+      address,
+      image: `${process.env.FRONTEND_URL}/assets/restaurant/${fileName}` || "",
+      opening_hours,
+      status,
+      description: description?.length > 0 ? description : null,
+      location,
+      cuisine_type,
     });
 
     await newRestaurant.save();
@@ -104,62 +126,56 @@ const createRestaurant = async (req, res) => {
 const updateRestaurant = async (req, res) => {
   try {
     const {
-      user_id,
       id,
-      restaurant_name,
+      owner_id,
       email,
-      contact,
+      password,
+      phone,
+      name,
+      address,
+      opening_hours,
+      status,
       description,
-      tagLine,
-      website_link,
-      isActive,
+      location,
+      cuisine_type,
     } = req.body;
 
-    const logo = req.file
-      ? `${process.env.FRONTEND_URL}/uploads/${req.file.filename}`
-      : null;
-
-    if (!id || !user_id) {
+    if (
+      !id ||
+      !owner_id ||
+      !email ||
+      !phone ||
+      !name ||
+      !req.file ||
+      !address ||
+      status === undefined
+    ) {
       return res.status(400).json({
-        message: "Both admin ID and user_id are required",
+        message:
+          "Missing required fields:ID, owner_id, email, phone, name, image, address or status",
         success: false,
       });
     }
 
-    if (!restaurant_name || !email || !contact || isActive === undefined) {
+    const idExists = await Restaurant.findById(id);
+    if (!idExists) {
       return res.status(400).json({
-        message: "Please provide restaurant_name, email, contact, isActive",
+        message: "Restaurant not found!",
         success: false,
       });
     }
 
-    const restaurant = await Restaurant.findOne({ _id: id, user_id });
-
-    if (!restaurant) {
-      return res.status(404).json({
-        message: "Restaurant not found with this ID and user_id",
-        success: false,
-      });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    const ownerExists = await UserAuth.findById(owner_id);
+    if (!ownerExists) {
       return res.status(400).json({
+        message: "Owner not found!",
         success: false,
-        message: "Invalid email format",
-      });
-    }
-
-    if (!/^\d{10}$/.test(contact)) {
-      return res.status(400).json({
-        success: false,
-        message: "Contact number must be exactly 10 digits",
       });
     }
 
     const duplicate = await Restaurant.findOne({
       _id: { $ne: id },
-      $or: [{ email }, { contact }],
+      $or: [{ email }, { phone }],
     });
 
     if (duplicate) {
@@ -168,54 +184,58 @@ const updateRestaurant = async (req, res) => {
           .status(409)
           .json({ success: false, message: "Email already in use" });
       }
-      if (duplicate.contact === contact) {
+      if (duplicate.phone === phone) {
         return res
           .status(409)
           .json({ success: false, message: "Contact already in use" });
       }
     }
 
-    restaurant.restaurant_name = restaurant_name;
-    restaurant.email = email;
-    restaurant.contact = contact;
-    restaurant.logo = logo || restaurant.logo;
-    restaurant.description = description || restaurant.description;
-    restaurant.tagLine = tagLine || restaurant.tagLine;
-    restaurant.website_link = website_link || restaurant.website_link;
-    restaurant.isActive = isActive;
+    if (idExists) {
+      const oldFileName = path.basename(idExists.image || "");
+      const oldFilePath = path.join(
+        __dirname,
+        "../assets/subCategory",
+        oldFileName
+      );
 
-    await restaurant.save();
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+      }
 
-    // const existingRestaurant = await Restaurant.findOne({ email });
-    // if (existingRestaurant) {
-    //   return res.status(400).json({
-    //     message: "Restaurant with this email already exists",
-    //     success: false,
-    //   });
-    // }
+      const uniqueName = crypto.randomBytes(2).toString("hex");
+      const ext = path.extname(req.file.originalname);
+      const fileName = `${uniqueName}${ext}`;
+      const uploadDir = path.join(__dirname, "../assets/restaurant");
 
-    // const existingRestaurantNumber = await Restaurant.findOne({ contact });
-    // if (existingRestaurantNumber) {
-    //   return res.status(400).json({
-    //     message: "Restaurant with this contact already exists",
-    //     success: false,
-    //   });
-    // }
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      const filePath = path.join(uploadDir, fileName);
+      fs.writeFileSync(filePath, req.file.buffer);
+
+      idExists.image = `${process.env.FRONTEND_URL}/assets/restaurant/${fileName}`;
+    }
+
+    idExists.owner_id = owner_id || idExists.owner_id;
+    idExists.email = email || idExists.email;
+    idExists.password = password || idExists.password;
+    idExists.phone = phone || idExists.phone;
+    idExists.name = name || idExists.name;
+    idExists.address = address || idExists.address;
+    idExists.opening_hours = opening_hours || idExists.opening_hours;
+    idExists.status = status || idExists.status;
+    idExists.description = description || idExists.description;
+    idExists.location = location || idExists.location;
+    idExists.cuisine_type = cuisine_type || idExists.cuisine_type;
+
+    await idExists.save();
 
     res.status(200).json({
       message: "Restaurant updated successfully",
       success: true,
-      data: {
-        user_id: user_id,
-        restaurant_name: restaurant.restaurant_name,
-        email: restaurant.email,
-        contact: restaurant.contact,
-        logo: restaurant.logo,
-        description: restaurant.description,
-        tagLine: restaurant.tagLine,
-        isActive: restaurant.isActive,
-        website_link: restaurant.website_link,
-      },
+      data: idExists,
     });
   } catch (err) {
     res.status(500).json({
@@ -228,27 +248,35 @@ const updateRestaurant = async (req, res) => {
 
 const deleteRestaurant = async (req, res) => {
   try {
-    const { id, user_id } = req.body;
+    const { id, owner_id } = req.body;
 
-    if (!id || !user_id) {
+    if (!id || !owner_id) {
       return res.status(400).json({
         success: false,
         message: "Both ID and user_id are required",
       });
     }
 
-    const restaurant = await Restaurant.findOne({ _id: id, user_id });
+    const ownerExists = await UserAuth.findOne({ _id: owner_id });
+    if (!ownerExists) {
+      return res.status(400).json({
+        message: "Owner not found!",
+        success: false,
+      });
+    }
+
+    const restaurant = await Restaurant.findOne({ _id: id, owner_id });
 
     if (!restaurant) {
       return res.status(404).json({
-        message: "Restaurant not found for the given user_id",
+        message: "Restaurant not found for the given owner_id",
         success: false,
       });
     }
 
     if (restaurant.image) {
       const fileName = path.basename(restaurant.image);
-      const filePath = path.join(__dirname, "../uploads", fileName);
+      const filePath = path.join(__dirname, "../assets/restaurant", fileName);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }

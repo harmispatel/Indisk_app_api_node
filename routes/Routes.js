@@ -98,16 +98,8 @@ router.put("/update-staff", uploadStaff.single("profile_photo"), updateStaff);
 router.delete("/delete-staff", upload.none(), deleteStaff);
 
 router.post("/restaurant-list", upload.none(), getRestaurant);
-router.post(
-  "/restaurant-create",
-  uploadRestaurant.single("logo"),
-  createRestaurant
-);
-router.put(
-  "/restaurant-update",
-  uploadRestaurant.single("logo"),
-  updateRestaurant
-);
+router.post("/restaurant-create", upload.single("image"), createRestaurant);
+router.put("/restaurant-update", upload.single("image"), updateRestaurant);
 router.delete("/restaurant-delete", upload.none(), deleteRestaurant);
 
 router.get("/staff/staff-list", getStaffList);
