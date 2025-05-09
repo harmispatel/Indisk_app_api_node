@@ -34,7 +34,6 @@ const createRestaurant = async (req, res) => {
       phone,
       name,
       address,
-      opening_hours,
       status,
       description,
       location,
@@ -100,7 +99,6 @@ const createRestaurant = async (req, res) => {
       name,
       address,
       image: `${process.env.FRONTEND_URL}/assets/restaurant/${fileName}` || "",
-      opening_hours,
       status,
       description: description?.length > 0 ? description : null,
       location,
@@ -133,7 +131,6 @@ const updateRestaurant = async (req, res) => {
       phone,
       name,
       address,
-      opening_hours,
       status,
       description,
       location,
@@ -224,7 +221,6 @@ const updateRestaurant = async (req, res) => {
     idExists.phone = phone || idExists.phone;
     idExists.name = name || idExists.name;
     idExists.address = address || idExists.address;
-    idExists.opening_hours = opening_hours || idExists.opening_hours;
     idExists.status = status || idExists.status;
     idExists.description = description || idExists.description;
     idExists.location = location || idExists.location;
