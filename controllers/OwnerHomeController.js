@@ -2,7 +2,6 @@ const StaffData = require("../models/staff");
 const Restaurant = require("../models/RestaurantCreate");
 const ManagerAuth = require("../models/manager");
 const UserAuth = require("../models/authLogin");
-const Order = require("../models/ownerHome"); // 👈 make sure this is imported
 
 const getOwnerHome = async (req, res) => {
   try {
@@ -27,44 +26,54 @@ const getOwnerHome = async (req, res) => {
     const restaurantCount = await Restaurant.countDocuments();
     const managerCount = await ManagerAuth.countDocuments();
 
-    // 🥇 Get Best Seller Restaurants
-    const bestSellers = await Order.aggregate([
-      { $match: { owner_id: ownerExists._id } },
+    // 👇 Static best sellers data
+    const bestSellers = [
       {
-        $group: {
-          _id: "$restaurant_id",
-          totalSales: { $sum: "$total_price" },
-          orderCount: { $sum: 1 },
-        },
+        restaurant_id: "1",
+        image: "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/15/0f/f0/a6/tg-s-the-oriental-grill.jpg?w=600&h=-1&s=1",
+        name: "Spicy Spoon",
+        location: "New York, NY",
+        cuisine_type: "Indian",
+        orderCount: 150,
+        totalSales: 3000,
       },
       {
-        $sort: { totalSales: -1 }, // highest total sales first
+        restaurant_id: "2",
+        image: "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/15/0f/f0/a6/tg-s-the-oriental-grill.jpg?w=600&h=-1&s=1",
+        name: "Bella Pasta",
+        location: "San Francisco, CA",
+        cuisine_type: "Italian",
+        orderCount: 120,
+        totalSales: 2750,
       },
       {
-        $limit: 5, // top 5 restaurants
+        restaurant_id: "3",
+        image: "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/15/0f/f0/a6/tg-s-the-oriental-grill.jpg?w=600&h=-1&s=1",
+        name: "Sushi Zen",
+        location: "Los Angeles, CA",
+        cuisine_type: "Japanese",
+        orderCount: 100,
+        totalSales: 2200,
       },
       {
-        $lookup: {
-          from: "restaurants",
-          localField: "_id",
-          foreignField: "_id",
-          as: "restaurant",
-        },
+        restaurant_id: "4",
+        image: "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/15/0f/f0/a6/tg-s-the-oriental-grill.jpg?w=600&h=-1&s=1",
+        name: "Taco Fiesta",
+        location: "Austin, TX",
+        cuisine_type: "Mexican",
+        orderCount: 90,
+        totalSales: 1900,
       },
       {
-        $unwind: "$restaurant",
+        restaurant_id: "5",
+        image: "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/15/0f/f0/a6/tg-s-the-oriental-grill.jpg?w=600&h=-1&s=1",
+        name: "Burger Haven",
+        location: "Chicago, IL",
+        cuisine_type: "American",
+        orderCount: 80,
+        totalSales: 1600,
       },
-      {
-        $project: {
-          _id: 0,
-          restaurant_id: "$_id",
-          name: "$restaurant.name",
-          location: "$restaurant.location",
-          totalSales: 1,
-          orderCount: 1,
-        },
-      },
-    ]);
+    ];
 
     return res.status(200).json({
       success: true,
@@ -72,8 +81,8 @@ const getOwnerHome = async (req, res) => {
         staffCount,
         restaurantCount,
         managerCount,
+        best_sellers: bestSellers,
       },
-      best_sellers: bestSellers,
     });
   } catch (error) {
     console.error("Error in getOwnerHome:", error);
