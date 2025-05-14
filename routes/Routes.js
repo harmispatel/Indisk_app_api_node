@@ -72,6 +72,8 @@ const {
   deleteSubCategory,
 } = require("../controllers/SubCategoryController");
 
+const { getOwnerHome } = require("../controllers/OwnerHomeController");
+
 router.get("/auth-user-list", getAuthUsers);
 router.post("/login", upload.none(), loginUser);
 router.post("/signup", upload.none(), registerUser);
@@ -145,5 +147,7 @@ router.post("/get-sub-category", upload.none(), getSubCategory),
   ),
   router.put("/update-sub-category", upload.single("image"), updateSubCategory),
   router.delete("/delete-sub-category", upload.none(), deleteSubCategory);
+
+router.post("/get-owner-home", upload.none(), getOwnerHome);
 
 module.exports = router;
