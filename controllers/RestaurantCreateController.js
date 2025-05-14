@@ -123,18 +123,73 @@ const createRestaurant = async (req, res) => {
     const mailOptions = {
       from: config.emailUser,
       to: email,
+      secure: false,
       subject: "Your Restaurant Login Credentials",
       html: `
-        <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
-          <h3>Welcome to Our Platform!</h3>
-          <p>Your restaurant account has been successfully created. Below are your login credentials:</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Password:</strong> ${password}</p>
-          <p>We recommend changing your password after logging in for the first time.</p>
-          <br />
-          <p>Best regards,<br />The Team</p>
-        </div>
-      `,
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #eee; border-radius: 8px; background-color: #f9f9f9; color: #333;">
+      <h2 style="color: #2c3e50; border-bottom: 2px solid #e2e2e2; padding-bottom: 10px;">🍽️ Welcome to Our Restaurant Platform!</h2>
+
+      <p style="font-size: 15px; line-height: 1.6;">
+        Hello,<br>
+        Your restaurant has been successfully registered. Here are your account and restaurant details:
+      </p>
+
+      <h3 style="margin-top: 25px; color: #34495e;">🔐 Login Credentials</h3>
+      <table style="width: 100%; font-size: 14px;">
+        <tr>
+          <td style="padding: 5px 0;"><strong>Email:</strong></td>
+          <td>${email}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 0;"><strong>Password:</strong></td>
+          <td>${password}</td>
+        </tr>
+      </table>
+
+      <h3 style="margin-top: 25px; color: #34495e;">🏪 Restaurant Info</h3>
+      <table style="width: 100%; font-size: 14px;">
+        <tr>
+          <td style="padding: 5px 0;"><strong>Name:</strong></td>
+          <td>${name}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 0;"><strong>Address:</strong></td>
+          <td>${address}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 0;"><strong>Location:</strong></td>
+          <td>${location}</td>
+        </tr>
+      </table>
+
+      ${
+        fileName
+          ? `
+      <div style="margin: 20px 0;">
+        <strong style="display: block; margin-bottom: 10px;">📷 Restaurant Image:</strong>
+        <img src="cid:restaurantImage" alt="Restaurant Image" style="width: 100%; max-width: 500px; border-radius: 5px;">
+      </div>
+      `
+          : ""
+      }
+
+      <p style="margin-top: 20px; font-size: 14px;">🔒 Please change your password after your first login for security reasons.</p>
+
+      <p style="margin-top: 30px; font-size: 14px;">
+        Cheers,<br>
+        <strong>The Restaurant Platform Team</strong>
+      </p>
+    </div>
+  `,
+      attachments: fileName
+        ? [
+            {
+              filename: "restaurant-image.png",
+              path: `${process.env.FRONTEND_URL}/assets/restaurant/${fileName}`,
+              cid: "restaurantImage",
+            },
+          ]
+        : [],
     };
 
     transporter.sendMail(mailOptions, function (error) {

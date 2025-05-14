@@ -5,7 +5,6 @@ const upload = multer();
 const {
   uploadManager,
   uploadStaff,
-  uploadRestaurant,
   uploadStaffs,
 } = require("../middlewares/upload");
 

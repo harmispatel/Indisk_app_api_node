@@ -74,11 +74,11 @@ const registerUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, role } = req.body;
 
-    if (!username || !password) {
+    if (!username || !password || !role) {
       return res.status(400).json({
-        message: "Username or email and password are required",
+        message: "Username/email, password, and role are required",
         success: false,
       });
     }

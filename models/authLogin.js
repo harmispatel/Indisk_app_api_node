@@ -6,7 +6,11 @@ const AuthData = mongoose.model(
     username: String,
     email: String,
     password: String,
-    role: String,
+    role: {
+      type: String,
+      enum: ["Owner", "Manager", "Staff"],
+      required: true,
+    },
     phone: Number,
     createdAt: { type: Date, default: Date.now },
   })
