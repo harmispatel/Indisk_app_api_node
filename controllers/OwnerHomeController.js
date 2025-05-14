@@ -26,7 +26,6 @@ const getOwnerHome = async (req, res) => {
     const restaurantCount = await Restaurant.countDocuments();
     const managerCount = await ManagerAuth.countDocuments();
 
-    // 👇 Static best sellers data
     const bestSellers = [
       {
         restaurant_id: "1",

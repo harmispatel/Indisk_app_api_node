@@ -2,10 +2,14 @@ const StaffData = require("../models/staff");
 const bcrypt = require("bcryptjs");
 const fs = require("fs");
 const path = require("path");
+const ManagerAuth = require("../models/manager");
+const Restaurant = require("../models/RestaurantCreate");
+const crypto = require("crypto");
+const UserAuth = require("../models/authLogin");
 
 const getStaff = async (req, res) => {
   try {
-    const staffData = await StaffData.find();
+    const staffData = await StaffData.findOne(manager_id);
 
     return res.status(200).json({
       success: true,
@@ -23,71 +27,107 @@ const getStaff = async (req, res) => {
 
 const createStaff = async (req, res) => {
   try {
-    const { name, username, phone, email, password, is_blocked } = req.body;
-
-    const profile_photo = req.file ? req.file.filename : null;
+    const {
+      name,
+      email,
+      password,
+      phone,
+      address,
+      restaurant_id,
+      manager_id,
+      status,
+    } = req.body;
 
     if (
-      !name?.trim() ||
-      !username?.trim() ||
-      !phone?.trim() ||
-      !email?.trim() ||
-      !password?.trim() ||
-      is_blocked === undefined
+      !name ||
+      !email ||
+      !password ||
+      !phone ||
+      !restaurant_id ||
+      !manager_id
     ) {
       return res.status(400).json({
+        message: "All fields required!",
         success: false,
-        message: "All fields are required",
       });
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const managerFound = await ManagerAuth.findOne({ _id: manager_id });
+    if (!managerFound) {
+      return res.status(400).json({
+        message: "Manager not found!",
+        success: false,
+      });
+    }
+
+    const restaurantFound = await Restaurant.findOne({ _id: restaurant_id });
+    if (!restaurantFound) {
+      return res.status(400).json({
+        message: "Restaurant not found!",
+        success: false,
+      });
+    }
+
+    const emailRegex = /\S+@\S+\.\S+/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
-        success: false,
         message: "Invalid email format",
+        success: false,
       });
     }
 
-    if (!/^\d{10}$/.test(phone)) {
+    const emailManagerExists = await StaffData.findOne({ email });
+    if (emailManagerExists) {
       return res.status(400).json({
+        message: "Staff member with this email already exists",
         success: false,
-        message: "Phone number must be exactly 10 digits",
       });
     }
 
-    const existingUser = await StaffData.findOne({
-      $or: [{ username }, { email }],
-    });
-
-    if (existingUser) {
-      return res.status(409).json({
+    const phoneExists = await StaffData.findOne({ phone });
+    if (phoneExists) {
+      return res.status(400).json({
+        message: "Staff member with this phone number already exists",
         success: false,
-        message: "Username or email already exists",
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const uniqueName = crypto.randomBytes(2).toString("hex");
+    const fileName = `${uniqueName}${path.extname(req.file.originalname)}`;
+    const uploadDir = path.join(__dirname, "../assets/staff");
+
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filePath = path.join(uploadDir, fileName);
+    fs.writeFileSync(filePath, req.file.buffer);
 
     const newStaff = new StaffData({
-      name: name.trim(),
-      username: username.trim(),
-      phone: phone.trim(),
-      email: email.trim().toLowerCase(),
-      password: hashedPassword,
-      profile_photo: `${process.env.FRONTEND_URL}/uploads/staffs/${profile_photo}`,
-      is_blocked,
+      name,
+      email,
+      password,
+      phone,
+      address,
+      profile_picture: `${process.env.FRONTEND_URL}/assets/staff/${fileName}`,
+      restaurant_id,
+      manager_id,
+      status,
     });
 
     await newStaff.save();
 
-    const staffData = newStaff.toObject();
-    // delete staffData.password;
+    const staffPersonal = new UserAuth({
+      email,
+      password,
+      role: "staff",
+    });
+    await staffPersonal.save();
 
-    return res.status(201).json({
-      success: true,
+    res.status(201).json({
       message: "Staff created successfully",
-      staff: staffData,
+      success: true,
+      data: newStaff,
     });
   } catch (error) {
     console.error("Error creating staff:", error.message);

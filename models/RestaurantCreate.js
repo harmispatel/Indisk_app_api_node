@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const moment = require("moment");
 
 const restaurantSchema = new mongoose.Schema({
   owner_id: {
@@ -19,7 +18,6 @@ const restaurantSchema = new mongoose.Schema({
   phone: {
     type: String,
     required: true,
-    unique: true,
   },
   name: {
     type: String,
@@ -46,23 +44,8 @@ const restaurantSchema = new mongoose.Schema({
   cuisine_type: {
     type: String,
   },
-  created_at: {
-    type: String,
-    default: function () {
-      return moment().format("DD-MM-YYYY hh:mm A");
-    },
-  },
-  updated_at: {
-    type: Date,
-    default: function () {
-      return moment().format("DD-MM-YYYY hh:mm A");
-    },
-  },
-});
-
-restaurantSchema.pre("save", function (next) {
-  this.updated_at = Date.now();
-  next();
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now },
 });
 
 const Restaurant = mongoose.model("restaurant", restaurantSchema);

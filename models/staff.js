@@ -1,27 +1,67 @@
 const mongoose = require("mongoose");
 
-const StaffData = mongoose.model(
-  "Staff",
-  new mongoose.Schema({
-    name: String,
-    username: String,
-    phone: {
-      type: String,
-      validate: {
-        validator: function (v) {
-          return /^\d{10}$/.test(v);
-        },
-        message: (props) =>
-          `${props.value} is not a valid 10-digit phone number!`,
-      },
-      required: [true, "Phone number is required"],
-    },
-    email: String,
-    password: String,
-    profile_photo: String,
-    is_blocked: String,
-    createdAt: { type: Date, default: Date.now },
-  })
-);
+const StaffSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
 
-module.exports = StaffData;
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+  },
+
+  password: {
+    type: String,
+    required: true,
+  },
+
+  phone: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+
+  profile_picture: {
+    type: String,
+    default: null,
+  },
+
+  address: {
+    type: String,
+    default: null,
+  },
+
+  restaurant_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "restaurant",
+    required: true,
+  },
+
+  manager_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Manager",
+    required: true,
+  },
+
+  status: {
+    type: String,
+    enum: ["active", "inactive"],
+    default: "active",
+  },
+
+  created_at: {
+    type: Date,
+    default: Date.now,
+  },
+
+  updated_at: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+module.exports = mongoose.model("StaffListData", StaffSchema);

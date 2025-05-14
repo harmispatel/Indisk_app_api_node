@@ -3,7 +3,11 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
-const StaffListData = require("../models/staffList");
+const StaffData = require("../models/staff");
+const ManagerAuth = require("../models/manager");
+const Restaurant = require("../models/RestaurantCreate");
+
+const allowedRoles = ["owner", "Manager", "Staff"];
 
 const getAuthUsers = async (req, res) => {
   try {
@@ -23,22 +27,29 @@ const getAuthUsers = async (req, res) => {
 };
 
 const registerUser = async (req, res) => {
-  const { username, email, password, role, phone } = req.body;
-
-  if (!email || !password) {
-    return res
-      .status(400)
-      .json({ message: "All fields are required", success: false });
-  }
-
-  const emailRegex = /\S+@\S+\.\S+/;
-  if (!emailRegex.test(email)) {
-    return res
-      .status(400)
-      .json({ message: "Invalid email format", success: false });
-  }
-
   try {
+    let { email, password, role } = req.body;
+
+    if (!email || !password || !role) {
+      return res
+        .status(400)
+        .json({ message: "All fields are required", success: false });
+    }
+
+    const emailRegex = /\S+@\S+\.\S+/;
+    if (!emailRegex.test(email)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid email format", success: false });
+    }
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({
+        message: `Invalid role. Allowed roles are: ${allowedRoles.join(", ")}`,
+        success: false,
+      });
+    }
+
     const existingUser = await UserAuth.findOne({ email });
     if (existingUser) {
       return res
@@ -49,12 +60,10 @@ const registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new UserAuth({
-      username,
       email,
       // password: hashedPassword,
       password,
       role,
-      phone,
     });
 
     await newUser.save();
@@ -72,57 +81,148 @@ const registerUser = async (req, res) => {
   }
 };
 
+// const loginUser = async (req, res) => {
+//   try {
+//     const { email, password, role } = req.body;
+
+//     if (!email || !password || !role) {
+//       return res.status(400).json({
+//         message: "Email, password, and role are required",
+//         success: false,
+//       });
+//     }
+
+//     const emailRegex = /\S+@\S+\.\S+/;
+//     if (!emailRegex.test(email)) {
+//       return res.status(400).json({
+//         message: "Invalid email format",
+//         success: false,
+//       });
+//     }
+
+//     let user = null;
+
+//     switch (role) {
+//       case "owner":
+//         user = await UserAuth.findOne({ email });
+//         break;
+//       case "manager":
+//         user = await ManagerAuth.findOne({ email });
+//         break;
+//       case "staff":
+//         user = await UserAuth.findOne({ email });
+//         break;
+//       default:
+//         return res.status(400).json({
+//           message: "Invalid role. Allowed roles: owner, manager, staff",
+//           success: false,
+//         });
+//     }
+
+//     if (!user) {
+//       return res.status(400).json({
+//         message: "User not found",
+//         success: false,
+//       });
+//     }
+
+//     if (user.password !== password) {
+//       return res.status(400).json({
+//         message: "Invalid password",
+//         success: false,
+//       });
+//     }
+
+//     let additionalData = {};
+
+//     if (role === "owner") {
+//       const restaurants = await Restaurant.find({ owner_id: user._id });
+//       additionalData = { restaurants };
+//     }
+
+//     if (role === "manager") {
+//       const restaurant = await Restaurant.find({ email: email });
+//       const staff = await StaffData.find({ manager_id: user._id });
+//       additionalData = { restaurant, staff };
+//     }
+
+//     if (role === "staff") {
+//       const restaurant = await Restaurant.findOne({ _id: user.restaurant_id });
+//       const manager = await ManagerAuth.findOne({ _id: user._id });
+//       additionalData = { restaurant, manager };
+//     }
+
+//     return res.status(200).json({
+//       message: "Login successful",
+//       success: true,
+//       // data: {
+//       //   user,
+//       //   ...additionalData,
+//       // },
+//       data: user,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     return res.status(500).json({
+//       message: "Server error",
+//       success: false,
+//     });
+//   }
+// };
+
 const loginUser = async (req, res) => {
   try {
-    const { username, password, role } = req.body;
+    const { email, password, role } = req.body;
 
-    if (!username || !password || !role) {
+    if (!email || !password || !role) {
       return res.status(400).json({
-        message: "Username/email, password, and role are required",
+        message: "Email, password, and role are required",
         success: false,
       });
     }
 
     const emailRegex = /\S+@\S+\.\S+/;
-    let user;
-    let userType = null;
-
-    if (emailRegex.test(username)) {
-      user = await UserAuth.findOne({ email: username });
-      userType = "UserAuth";
-      if (!user) {
-        user = await StaffListData.findOne({ email: username });
-        userType = "StaffListData";
-      }
-    } else {
-      user = await UserAuth.findOne({ username: username });
-      userType = "UserAuth";
-      if (!user) {
-        user = await StaffListData.findOne({ username: username });
-        userType = "StaffListData";
-      }
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        message: "Invalid email format",
+        success: false,
+      });
     }
 
+    const user = await UserAuth.findOne({ email });
+
     if (!user) {
-      return res
-        .status(400)
-        .json({ message: "Invalid username or email", success: false });
+      return res.status(404).json({
+        message: "Invalid email",
+        success: false,
+      });
     }
 
     if (user.password !== password) {
-      return res
-        .status(400)
-        .json({ message: "Invalid password", success: false });
+      return res.status(400).json({
+        message: "Invalid password",
+        success: false,
+      });
     }
 
-    res.status(200).json({
+    if (user.role !== role) {
+      return res.status(403).json({
+        message: "Unauthorized role access",
+        success: false,
+      });
+    }
+
+    return res.status(200).json({
       message: "Login successful",
       success: true,
       data: user,
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error", success: false });
+    return res.status(500).json({
+      message: "Server error",
+      success: false,
+    });
   }
 };
 

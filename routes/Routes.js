@@ -93,9 +93,9 @@ router.put(
 );
 router.delete("/delete-manager", upload.none(), deleteManager);
 
-router.get("/staff-list", getStaff);
-router.post("/create-staff", uploadStaff.single("profile_photo"), createStaff);
-router.put("/update-staff", uploadStaff.single("profile_photo"), updateStaff);
+router.post("/staff-list", upload.none(), getStaff);
+router.post("/create-staff", upload.single("profile_picture"), createStaff);
+router.put("/update-staff", upload.single("profile_picture"), updateStaff);
 router.delete("/delete-staff", upload.none(), deleteStaff);
 
 router.post("/restaurant-list", upload.none(), getRestaurant);

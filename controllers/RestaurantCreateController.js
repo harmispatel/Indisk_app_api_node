@@ -1,5 +1,6 @@
 const Restaurant = require("../models/RestaurantCreate");
 const UserAuth = require("../models/authLogin");
+const ManagerAuth = require("../models/manager");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -74,6 +75,14 @@ const createRestaurant = async (req, res) => {
       });
     }
 
+    const emailManagerExists = await ManagerAuth.findOne({ email });
+    if (emailManagerExists) {
+      return res.status(400).json({
+        message: "Restaurant Manager with this email already exists",
+        success: false,
+      });
+    }
+
     const phoneExists = await Restaurant.findOne({ phone });
     if (phoneExists) {
       return res.status(400).json({
@@ -108,6 +117,13 @@ const createRestaurant = async (req, res) => {
     });
 
     await newRestaurant.save();
+
+    const manager = new UserAuth({
+      email,
+      password,
+      role: "manager",
+    });
+    await manager.save();
 
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
@@ -268,6 +284,11 @@ const updateRestaurant = async (req, res) => {
       $or: [{ email }, { phone }],
     });
 
+    const duplicateManager = await ManagerAuth.findOne({
+      _id: { $ne: id },
+      $or: [{ email }],
+    });
+
     if (duplicate) {
       if (duplicate.email === email) {
         return res
@@ -278,6 +299,15 @@ const updateRestaurant = async (req, res) => {
         return res
           .status(409)
           .json({ success: false, message: "Contact already in use" });
+      }
+    }
+
+    if (duplicateManager) {
+      if (duplicateManager.email === email) {
+        return res.status(409).json({
+          success: false,
+          message: "Restaurant Manager with this email already exists",
+        });
       }
     }
 
@@ -320,6 +350,15 @@ const updateRestaurant = async (req, res) => {
     idExists.cuisine_type = cuisine_type || idExists.cuisine_type;
 
     await idExists.save();
+
+    let manager = await ManagerAuth.findById(email);
+
+    if (manager) {
+      manager.email = email || manager.email;
+      manager.password = password || manager.password;
+      manager.role = "manager";
+      await manager.save();
+    }
 
     res.status(200).json({
       message: "Restaurant updated successfully",
