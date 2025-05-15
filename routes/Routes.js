@@ -2,11 +2,6 @@ const express = require("express");
 const router = express.Router();
 const multer = require("multer");
 const upload = multer();
-const {
-  uploadManager,
-  uploadStaff,
-  uploadStaffs,
-} = require("../middlewares/upload");
 
 const {
   getAuthUsers,
@@ -36,13 +31,6 @@ const {
   updateRestaurant,
   deleteRestaurant,
 } = require("../controllers/RestaurantCreateController");
-
-const {
-  getStaffList,
-  createStaffData,
-  updateStaffData,
-  deleteStaffData,
-} = require("../controllers/StaffListController");
 
 const {
   getFoodCategory,
@@ -80,17 +68,9 @@ router.post("/signup", upload.none(), registerUser);
 router.post("/forgot-password", upload.none(), forgotPassword);
 router.post("/reset-password", upload.none(), resetPassword);
 
-router.get("/manager-list", getManager);
-router.post(
-  "/create-manager",
-  uploadManager.single("profile_photo"),
-  createManager
-);
-router.put(
-  "/update-manager",
-  uploadManager.single("profile_photo"),
-  updateManager
-);
+router.post("/manager-list", upload.none(), getManager);
+router.post("/create-manager", upload.single("profile_photo"), createManager);
+router.put("/update-manager", upload.single("profile_photo"), updateManager);
 router.delete("/delete-manager", upload.none(), deleteManager);
 
 router.post("/staff-list", upload.none(), getStaff);
@@ -102,19 +82,6 @@ router.post("/restaurant-list", upload.none(), getRestaurant);
 router.post("/restaurant-create", upload.single("image"), createRestaurant);
 router.put("/restaurant-update", upload.single("image"), updateRestaurant);
 router.delete("/restaurant-delete", upload.none(), deleteRestaurant);
-
-router.get("/staff/staff-list", getStaffList);
-router.post(
-  "/staff/staff-create",
-  uploadStaffs.single("image"),
-  createStaffData
-);
-router.put(
-  "/staff/staff-update",
-  uploadStaffs.single("image"),
-  updateStaffData
-);
-router.delete("/staff/staff-delete", upload.none(), deleteStaffData);
 
 router.get("/food-category-list", getFoodCategory);
 router.post(

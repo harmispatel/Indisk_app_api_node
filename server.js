@@ -32,7 +32,6 @@ app.delete("/api/cache/clear", (req, res) => {
 });
 
 app.use("/api", routes);
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/assets", express.static(path.join(__dirname, "assets")));
 
 app.use(errorMiddleware);

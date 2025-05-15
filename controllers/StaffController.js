@@ -144,10 +144,6 @@ const updateStaff = async (req, res) => {
   try {
     const { id, name, username, phone, email, password, is_blocked } = req.body;
 
-    // const profile_photo = req.file
-    //   ? `${process.env.FRONTEND_URL}/uploads/staffs/${req.file.filename}`
-    //   : null;
-
     if (!id) {
       return res.status(400).json({
         success: false,
@@ -167,16 +163,12 @@ const updateStaff = async (req, res) => {
     if (req.file) {
       const oldFileName = path.basename(existingStaff.profile_photo);
 
-      const oldFilePath = path.join(
-        __dirname,
-        "../uploads/staffs",
-        oldFileName
-      );
+      const oldFilePath = path.join(__dirname, "../assets/staff", oldFileName);
       if (fs.existsSync(oldFilePath)) {
         fs.unlinkSync(oldFilePath);
       }
 
-      profile_photo = `${process.env.FRONTEND_URL}/uploads/staffs/${req.file.filename}`;
+      profile_photo = `${process.env.FRONTEND_URL}/assets/staff/${req.file.filename}`;
     }
 
     if (

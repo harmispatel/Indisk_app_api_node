@@ -76,7 +76,7 @@ const createManager = async (req, res) => {
       phone: phone.trim(),
       email: email.trim().toLowerCase(),
       password: hashedPassword,
-      profile_photo: `${process.env.FRONTEND_URL}/uploads/managers/${profile_photo}`,
+      profile_photo: `${process.env.FRONTEND_URL}/assets/manager/${profile_photo}`,
       is_blocked,
     });
 
@@ -118,7 +118,7 @@ const updateManager = async (req, res) => {
       const oldFileName = path.basename(existingManager.profile_photo || "");
       const oldFilePath = path.join(
         __dirname,
-        "../uploads/managers",
+        "../assets/manager",
         oldFileName
       );
 
@@ -126,7 +126,7 @@ const updateManager = async (req, res) => {
         fs.unlinkSync(oldFilePath);
       }
 
-      profile_photo = `${process.env.FRONTEND_URL}/uploads/managers/${req.file.filename}`;
+      profile_photo = `${process.env.FRONTEND_URL}/assets/manager/${req.file.filename}`;
     }
 
     if (
@@ -227,7 +227,7 @@ const deleteManager = async (req, res) => {
 
     if (manager.profile_photo) {
       const fileName = path.basename(manager.profile_photo);
-      const filePath = path.join(__dirname, "../uploads/managers", fileName);
+      const filePath = path.join(__dirname, "../assets/manager", fileName);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
