@@ -1,11 +1,8 @@
 const UserAuth = require("../models/authLogin");
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
-const crypto = require("crypto");
-const StaffData = require("../models/staff");
-const ManagerAuth = require("../models/manager");
-const Restaurant = require("../models/RestaurantCreate");
+const randomstring = require("randomstring");
+const config = require("../config/nodemailer");
 
 const allowedRoles = ["owner", "Manager", "Staff"];
 
@@ -81,95 +78,6 @@ const registerUser = async (req, res) => {
   }
 };
 
-// const loginUser = async (req, res) => {
-//   try {
-//     const { email, password, role } = req.body;
-
-//     if (!email || !password || !role) {
-//       return res.status(400).json({
-//         message: "Email, password, and role are required",
-//         success: false,
-//       });
-//     }
-
-//     const emailRegex = /\S+@\S+\.\S+/;
-//     if (!emailRegex.test(email)) {
-//       return res.status(400).json({
-//         message: "Invalid email format",
-//         success: false,
-//       });
-//     }
-
-//     let user = null;
-
-//     switch (role) {
-//       case "owner":
-//         user = await UserAuth.findOne({ email });
-//         break;
-//       case "manager":
-//         user = await ManagerAuth.findOne({ email });
-//         break;
-//       case "staff":
-//         user = await UserAuth.findOne({ email });
-//         break;
-//       default:
-//         return res.status(400).json({
-//           message: "Invalid role. Allowed roles: owner, manager, staff",
-//           success: false,
-//         });
-//     }
-
-//     if (!user) {
-//       return res.status(400).json({
-//         message: "User not found",
-//         success: false,
-//       });
-//     }
-
-//     if (user.password !== password) {
-//       return res.status(400).json({
-//         message: "Invalid password",
-//         success: false,
-//       });
-//     }
-
-//     let additionalData = {};
-
-//     if (role === "owner") {
-//       const restaurants = await Restaurant.find({ owner_id: user._id });
-//       additionalData = { restaurants };
-//     }
-
-//     if (role === "manager") {
-//       const restaurant = await Restaurant.find({ email: email });
-//       const staff = await StaffData.find({ manager_id: user._id });
-//       additionalData = { restaurant, staff };
-//     }
-
-//     if (role === "staff") {
-//       const restaurant = await Restaurant.findOne({ _id: user.restaurant_id });
-//       const manager = await ManagerAuth.findOne({ _id: user._id });
-//       additionalData = { restaurant, manager };
-//     }
-
-//     return res.status(200).json({
-//       message: "Login successful",
-//       success: true,
-//       // data: {
-//       //   user,
-//       //   ...additionalData,
-//       // },
-//       data: user,
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     return res.status(500).json({
-//       message: "Server error",
-//       success: false,
-//     });
-//   }
-// };
-
 const loginUser = async (req, res) => {
   try {
     const { email, password, role } = req.body;
@@ -226,67 +134,84 @@ const loginUser = async (req, res) => {
   }
 };
 
-const sendResetEmail = async (email, resetUrl) => {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: "Password Reset Request",
-    html: `
-        <h3>Password Reset Request</h3>
-        <p>You have requested to reset your password. Please click the link below to reset your password:</p>
-        <a href="${resetUrl}">Reset Password</a>
-        <p>If you did not request this, please ignore this email.</p>
-      `,
-  };
-
+const sendResetEmail = async (email, token) => {
   try {
-    await transporter.sendMail(mailOptions);
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: {
+        user: config.emailUser,
+        pass: config.emailPassword,
+      },
+    });
+
+    const mailOptions = {
+      from: config.emailUser,
+      to: email,
+      subject: "Reset Your Password",
+      html: `
+    <div style="font-family: Arial, sans-serif; font-size: 15px; color: #333;">
+      <h2 style="color: #1a73e8;">Reset Your Password</h2>
+      <p>Hello,</p>
+      <p>We received a request to reset your password. Click the button below to continue:</p>
+      <p>
+        <a href="http://192.168.1.87:3000/reset-password/${token}" 
+           style="display: inline-block; padding: 10px 20px; background-color: #1a73e8; color: #ffffff; text-decoration: none; border-radius: 4px; font-weight: bold;">
+          Reset Password
+        </a>
+      </p>
+      <p>If you didn’t request a password reset, you can safely ignore this email.</p>
+      <p>Thanks,<br>The Support Team</p>
+    </div>
+  `,
+    };
+
+    transporter.sendMail(mailOptions, function (error) {
+      if (error) {
+        console.log(error);
+      } else {
+        console.log("Mail has been sent to your email");
+      }
+    });
   } catch (error) {
-    console.error("Error sending email:", error);
+    res.status(400).send({
+      success: false,
+      msg: error.message,
+    });
   }
 };
 
 const forgotPassword = async (req, res) => {
-  const { email } = req.body;
-
-  if (!email) {
-    return res
-      .status(400)
-      .json({ message: "Email is required", success: false });
-  }
-
   try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ message: "Email is required", success: false });
+    }
+
     const user = await UserAuth.findOne({ email });
-    if (!user) {
+    if (user) {
+      const randomString = randomstring.generate();
+      const data = await UserAuth.updateOne(
+        { email: email },
+        { $set: { token: randomString } }
+      );
+      sendResetEmail(user.email, randomString);
+      return res.status(200).json({
+        message:
+          "Password reset email sent successfully. Please check your inbox.",
+        success: true,
+      });
+    } else {
       return res.status(400).json({
         message: "User with this email does not exist",
         success: false,
       });
     }
-
-    const secretKey = crypto.randomBytes(32).toString("hex");
-
-    const resetToken = jwt.sign({ userId: user._id }, secretKey, {
-      expiresIn: "1h",
-    });
-
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-
-    // await sendResetEmail(email, resetUrl);
-
-    res.status(200).json({
-      message:
-        "Password reset email sent successfully. Please check your inbox.",
-      success: true,
-    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error", success: false });
@@ -294,31 +219,31 @@ const forgotPassword = async (req, res) => {
 };
 
 const resetPassword = async (req, res) => {
-  const { token, newPassword } = req.body;
-
-  if (!token) {
-    return res.status(400).json({ message: "Token required", success: false });
-  }
-
-  if (!newPassword) {
-    return res
-      .status(400)
-      .json({ message: "New password required", success: false });
-  }
-
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { token, newPassword } = req.body;
 
-    const user = await UserAuth.findById(decoded.userId);
-    if (!user) {
+    if (!token) {
       return res
         .status(400)
-        .json({ message: "Invalid token or user not found", success: false });
+        .json({ message: "Token required", success: false });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    if (!newPassword) {
+      return res
+        .status(400)
+        .json({ message: "New password required", success: false });
+    }
+    const user = await UserAuth.findOne({ token });
 
-    user.password = hashedPassword;
+    if (!user) {
+      return res
+        .status(200)
+        .json({ message: "Invalid or expired token", success: false });
+    }
+
+    user.token = "";
+    const hashedPassword = await bcrypt.hash(password, 10);
+    user.password = password;
     await user.save();
 
     res.status(200).json({
