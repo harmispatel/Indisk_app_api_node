@@ -284,11 +284,6 @@ const updateRestaurant = async (req, res) => {
       $or: [{ email }, { phone }],
     });
 
-    const duplicateManager = await ManagerAuth.findOne({
-      _id: { $ne: id },
-      $or: [{ email }],
-    });
-
     if (duplicate) {
       if (duplicate.email === email) {
         return res
@@ -301,6 +296,11 @@ const updateRestaurant = async (req, res) => {
           .json({ success: false, message: "Contact already in use" });
       }
     }
+
+    const duplicateManager = await ManagerAuth.findOne({
+      _id: { $ne: id },
+      $or: [{ email }],
+    });
 
     if (duplicateManager) {
       if (duplicateManager.email === email) {
@@ -315,7 +315,7 @@ const updateRestaurant = async (req, res) => {
       const oldFileName = path.basename(idExists.image || "");
       const oldFilePath = path.join(
         __dirname,
-        "../assets/subCategory",
+        "../assets/restaurant",
         oldFileName
       );
 
@@ -351,7 +351,7 @@ const updateRestaurant = async (req, res) => {
 
     await idExists.save();
 
-    let manager = await ManagerAuth.findById(email);
+    let manager = await ManagerAuth.findOne({ email });
 
     if (manager) {
       manager.email = email || manager.email;

@@ -11,12 +11,7 @@ const {
   resetPassword,
 } = require("../controllers/AuthLoginController");
 
-const {
-  getManager,
-  createManager,
-  updateManager,
-  deleteManager,
-} = require("../controllers/ManagerController");
+const { getManager, createStaffManager } = require("../controllers/ManagerController");
 
 const {
   getStaff,
@@ -69,9 +64,7 @@ router.post("/forgot-password", upload.none(), forgotPassword);
 router.post("/reset-password", upload.none(), resetPassword);
 
 router.post("/manager-list", upload.none(), getManager);
-router.post("/create-manager", upload.single("profile_photo"), createManager);
-router.put("/update-manager", upload.single("profile_photo"), updateManager);
-router.delete("/delete-manager", upload.none(), deleteManager);
+router.post("/manager/create-staff", upload.single("image"), upload.none(), createStaffManager);
 
 router.post("/staff-list", upload.none(), getStaff);
 router.post("/create-staff", upload.single("profile_picture"), createStaff);

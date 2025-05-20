@@ -4,19 +4,25 @@ const nodemailer = require("nodemailer");
 const randomstring = require("randomstring");
 const config = require("../config/nodemailer");
 
-const allowedRoles = ["owner", "Manager", "Staff"];
+const allowedRoles = ["owner", "manager", "staff"];
 
 const getAuthUsers = async (req, res) => {
   try {
     const users = await UserAuth.find();
+
+    const groupedUsers = {};
+    allowedRoles.forEach((role) => {
+      groupedUsers[role] = users.filter((user) => user.role === role);
+    });
+
     res.status(200).json({
       message: "Login Users fetched successfully",
       success: true,
-      data: users,
+      data: groupedUsers,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Error fetching  users",
+      message: "Error fetching users",
       success: false,
       error: error.message,
     });
