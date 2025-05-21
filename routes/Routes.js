@@ -9,9 +9,15 @@ const {
   registerUser,
   forgotPassword,
   resetPassword,
+  changePassword,
+  getProfile,
+  editProfile,
 } = require("../controllers/AuthLoginController");
 
-const { getManager, createStaffManager } = require("../controllers/ManagerController");
+const {
+  getManager,
+  createStaffManager,
+} = require("../controllers/ManagerController");
 
 const {
   getStaff,
@@ -25,6 +31,7 @@ const {
   createRestaurant,
   updateRestaurant,
   deleteRestaurant,
+  getRestaurantDetails,
 } = require("../controllers/RestaurantCreateController");
 
 const {
@@ -62,9 +69,17 @@ router.post("/login", upload.none(), loginUser);
 router.post("/signup", upload.none(), registerUser);
 router.post("/forgot-password", upload.none(), forgotPassword);
 router.post("/reset-password", upload.none(), resetPassword);
+router.post("/change-password", upload.none(), changePassword);
+router.post("/get-profile", upload.none(), getProfile);
+router.post("/edit-profile", upload.single("image"), editProfile);
 
 router.post("/manager-list", upload.none(), getManager);
-router.post("/manager/create-staff", upload.single("image"), upload.none(), createStaffManager);
+router.post(
+  "/manager/create-staff",
+  upload.single("image"),
+  upload.none(),
+  createStaffManager
+);
 
 router.post("/staff-list", upload.none(), getStaff);
 router.post("/create-staff", upload.single("profile_picture"), createStaff);
@@ -75,6 +90,7 @@ router.post("/restaurant-list", upload.none(), getRestaurant);
 router.post("/restaurant-create", upload.single("image"), createRestaurant);
 router.put("/restaurant-update", upload.single("image"), updateRestaurant);
 router.delete("/restaurant-delete", upload.none(), deleteRestaurant);
+router.post("/get-restaurant-details", upload.none(), getRestaurantDetails);
 
 router.get("/food-category-list", getFoodCategory);
 router.post(

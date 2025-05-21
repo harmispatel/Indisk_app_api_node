@@ -3,6 +3,9 @@ const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const randomstring = require("randomstring");
 const config = require("../config/nodemailer");
+const fs = require("fs");
+const crypto = require("crypto");
+const path = require("path");
 
 const allowedRoles = ["owner", "manager", "staff"];
 
@@ -262,10 +265,147 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const changePassword = async (req, res) => {
+  try {
+    const { email, currentPassword, newPassword } = req.body;
+
+    if (!email || !currentPassword || !newPassword) {
+      return res.status(400).json({
+        message: "Email, current password, and new password are required",
+        success: false,
+      });
+    }
+
+    const user = await UserAuth.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+        success: false,
+      });
+    }
+
+    if (user.password !== currentPassword) {
+      return res.status(401).json({
+        message: "Current password is incorrect",
+        success: false,
+      });
+    }
+
+    // const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    user.password = newPassword;
+    await user.save();
+
+    return res.status(200).json({
+      message: "Password changed successfully",
+      success: true,
+    });
+  } catch (error) {
+    console.error("Change Password Error:", error);
+    res.status(500).json({
+      message: "Server error",
+      success: false,
+    });
+  }
+};
+
+const getProfile = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ message: "Email is required", success: false });
+    }
+
+    const user = await UserAuth.findOne({ email });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "User not found", success: false });
+    }
+
+    res.status(200).json({
+      message: "Profile fetched successfully",
+      success: true,
+      data: user,
+    });
+  } catch (err) {
+    console.error("Get Profile Error:", err);
+    res.status(500).json({ message: "Server error", success: false });
+  }
+};
+
+const editProfile = async (req, res) => {
+  try {
+    const { email, username, gender } = req.body;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ message: "Email is required", success: false });
+    }
+
+    const user = await UserAuth.findOne({ email });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "User not found", success: false });
+    }
+
+    if (username) user.username = username;
+    if (gender) user.gender = gender;
+
+   if (req.file) {
+      const oldFileName = path.basename(user.image || "");
+      const oldFilePath = path.join(__dirname, "../assets/profile", oldFileName);
+
+      if (user.image && fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+      }
+
+      const uniqueName = crypto.randomBytes(2).toString("hex");
+      const ext = path.extname(req.file.originalname);
+      const fileName = `${uniqueName}${ext}`;
+      const uploadDir = path.join(__dirname, "../assets/profile");
+
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      const filePath = path.join(uploadDir, fileName);
+      fs.writeFileSync(filePath, req.file.buffer);
+
+      user.image = `${process.env.FRONTEND_URL}/assets/profile/${fileName}`;
+    }
+
+    if (!user.image) {
+      user.image = "https://cdn3.iconfinder.com/data/icons/avatars-collection/256/22-512.png";
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      message: "Profile updated successfully",
+      success: true,
+      data: user,
+    });
+  } catch (err) {
+    console.error("Edit Profile Error:", err);
+    res.status(500).json({ message: "Server error", success: false });
+  }
+};
+
 module.exports = {
   getAuthUsers,
   registerUser,
   loginUser,
   forgotPassword,
   resetPassword,
+  changePassword,
+  getProfile,
+  editProfile,
 };

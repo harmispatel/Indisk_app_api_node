@@ -425,9 +425,103 @@ const deleteRestaurant = async (req, res) => {
   }
 };
 
+const getRestaurantDetails = async (req, res) => {
+  try {
+    const { owner_id, restaurant_id } = req.body;
+    if (!owner_id || !restaurant_id) {
+      return res.status(400).json({
+        message: "Missing required fields:owner_id, restaurant_id",
+        success: false,
+      });
+    }
+
+    const ownerExists = await UserAuth.findOne({ _id: owner_id });
+    if (!ownerExists) {
+      return res.status(400).json({
+        message: "Owner not found!",
+        success: false,
+      });
+    }
+
+    const restaurant = await Restaurant.findById(restaurant_id);
+    if (!restaurant) {
+      return res.status(400).json({
+        message: "Restaurant not found!",
+        success: false,
+      });
+    }
+
+    // const categories = await Category.find({ restaurant_id });
+    // const foods = await Food.find({ restaurant_id });
+    // const staff = await Staff.find({ restaurant_id });
+    // let manager = null;
+    // if (restaurant.manager_id) {
+    //   manager = await UserAuth.findById(restaurant.manager_id);
+    // } else {
+    //   manager = await UserAuth.findOne({ restaurant_id, role: "manager" });
+    // }
+
+    const categories = [
+      { _id: "cat1", name: "Appetizers", restaurant_id },
+      { _id: "cat2", name: "Main Course", restaurant_id },
+    ];
+
+    const foods = [
+      {
+        _id: "food1",
+        name: "Garlic Bread",
+        price: 5.99,
+        category_id: "cat1",
+        restaurant_id,
+      },
+      {
+        _id: "food2",
+        name: "Spaghetti Carbonara",
+        price: 12.99,
+        category_id: "cat2",
+        restaurant_id,
+      },
+    ];
+
+    const staff = [
+      { _id: "staff1", name: "John Doe", role: "chef", restaurant_id },
+      { _id: "staff2", name: "Jane Smith", role: "waiter", restaurant_id },
+    ];
+
+    const manager = {
+      _id: "static_manager_id",
+      name: "Alice Johnson",
+      email: "alice@bistro.com",
+      role: "manager",
+    };
+
+    const restaurantDetails = {
+      ...restaurant.toObject(),
+      categories,
+      foods,
+      staff,
+      manager,
+    };
+
+    return res.status(200).json({
+      message: "Restaurant details fetched successfully",
+      success: true,
+      data: restaurantDetails,
+    });
+  } catch (error) {
+    console.error(err);
+    return res.status(500).json({
+      message: "Failed to retrieve restaurant details",
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
 module.exports = {
   getRestaurant,
   createRestaurant,
   updateRestaurant,
   deleteRestaurant,
+  getRestaurantDetails,
 };
