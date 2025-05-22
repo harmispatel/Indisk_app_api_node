@@ -32,6 +32,7 @@ const {
   updateRestaurant,
   deleteRestaurant,
   getRestaurantDetails,
+  getRestaurantByManager,
 } = require("../controllers/RestaurantCreateController");
 
 const {
@@ -81,7 +82,7 @@ router.post(
   createStaffManager
 );
 
-router.post("/staff-list", upload.none(), getStaff);
+router.post("/manager/staff-list", upload.none(), getStaff);
 router.post("/create-staff", upload.single("profile_picture"), createStaff);
 router.put("/update-staff", upload.single("profile_picture"), updateStaff);
 router.delete("/delete-staff", upload.none(), deleteStaff);
@@ -91,6 +92,7 @@ router.post("/restaurant-create", upload.single("image"), createRestaurant);
 router.put("/restaurant-update", upload.single("image"), updateRestaurant);
 router.delete("/restaurant-delete", upload.none(), deleteRestaurant);
 router.post("/get-restaurant-details", upload.none(), getRestaurantDetails);
+router.post("/restaurant/manager", upload.none(), getRestaurantByManager);
 
 router.get("/food-category-list", getFoodCategory);
 router.post(

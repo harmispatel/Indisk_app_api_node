@@ -6,10 +6,34 @@ const ManagerAuth = require("../models/manager");
 const Restaurant = require("../models/RestaurantCreate");
 const crypto = require("crypto");
 const UserAuth = require("../models/authLogin");
+const mongoose = require("mongoose");
 
 const getStaff = async (req, res) => {
   try {
-    const staffData = await StaffData.findOne(manager_id);
+    const { manager_id } = req.body;
+
+    if (!manager_id) {
+      return res.status(400).json({
+        success: false,
+        message: "manager_id is required",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(manager_id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid manager_id format",
+      });
+    }
+
+    const staffData = await StaffData.find({ manager_id });
+
+    if (staffData.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No staff found for the provided manager_id",
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -32,40 +56,34 @@ const createStaff = async (req, res) => {
       email,
       password,
       phone,
+      gender,
       address,
+      status,
+      isBlocked,
       restaurant_id,
       manager_id,
-      status,
     } = req.body;
 
-    if (
-      !name ||
-      !email ||
-      !password ||
-      !phone ||
-      !restaurant_id ||
-      !manager_id
-    ) {
+    if (!name || !email || !password || !restaurant_id || !manager_id) {
       return res.status(400).json({
-        message: "All fields required!",
+        message:
+          "Missing required fields: name, email, password, restaurant_id, manager_id",
         success: false,
       });
     }
 
-    const managerFound = await ManagerAuth.findOne({ _id: manager_id });
+    const managerFound = await ManagerAuth.findById(manager_id);
     if (!managerFound) {
-      return res.status(400).json({
-        message: "Manager not found!",
-        success: false,
-      });
+      return res
+        .status(404)
+        .json({ message: "Manager not found", success: false });
     }
 
-    const restaurantFound = await Restaurant.findOne({ _id: restaurant_id });
+    const restaurantFound = await Restaurant.findById(restaurant_id);
     if (!restaurantFound) {
-      return res.status(400).json({
-        message: "Restaurant not found!",
-        success: false,
-      });
+      return res
+        .status(404)
+        .json({ message: "Restaurant not found", success: false });
     }
 
     const emailRegex = /\S+@\S+\.\S+/;
@@ -76,12 +94,11 @@ const createStaff = async (req, res) => {
       });
     }
 
-    const emailManagerExists = await StaffData.findOne({ email });
-    if (emailManagerExists) {
-      return res.status(400).json({
-        message: "Staff member with this email already exists",
-        success: false,
-      });
+    const emailExists = await StaffData.findOne({ email });
+    if (emailExists) {
+      return res
+        .status(400)
+        .json({ message: "Email already in use", success: false });
     }
 
     const phoneExists = await StaffData.findOne({ phone });

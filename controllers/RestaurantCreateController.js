@@ -1,12 +1,12 @@
 const Restaurant = require("../models/RestaurantCreate");
 const UserAuth = require("../models/authLogin");
-const ManagerAuth = require("../models/manager");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
 const config = require("../config/nodemailer");
 const nodemailer = require("nodemailer");
+const Manager = require("../models/manager");
 
 const getRestaurant = async (req, res) => {
   try {
@@ -68,25 +68,22 @@ const createRestaurant = async (req, res) => {
     }
 
     const emailExists = await Restaurant.findOne({ email });
-    if (emailExists) {
-      return res.status(400).json({
-        message: "Restaurant with this email already exists",
-        success: false,
-      });
-    }
-
-    const emailManagerExists = await ManagerAuth.findOne({ email });
-    if (emailManagerExists) {
-      return res.status(400).json({
-        message: "Restaurant Manager with this email already exists",
-        success: false,
-      });
-    }
-
+    const emailManagerExists = await UserAuth.findOne({
+      email,
+      role: "manager",
+    });
     const phoneExists = await Restaurant.findOne({ phone });
+
+    if (emailExists || emailManagerExists) {
+      return res.status(400).json({
+        message: "Email already in use for another restaurant or manager",
+        success: false,
+      });
+    }
+
     if (phoneExists) {
       return res.status(400).json({
-        message: "Restaurant with this phone number already exists",
+        message: "Phone number already in use",
         success: false,
       });
     }
@@ -124,6 +121,14 @@ const createRestaurant = async (req, res) => {
       role: "manager",
     });
     await manager.save();
+
+    const managerDetails = new Manager({
+      user_id: manager._id,
+      restaurant_id: newRestaurant._id,
+      assigned_by: owner_id,
+      restaurant: newRestaurant,
+    });
+    await managerDetails.save();
 
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
@@ -297,7 +302,7 @@ const updateRestaurant = async (req, res) => {
       }
     }
 
-    const duplicateManager = await ManagerAuth.findOne({
+    const duplicateManager = await Manager.findOne({
       _id: { $ne: id },
       $or: [{ email }],
     });
@@ -351,7 +356,7 @@ const updateRestaurant = async (req, res) => {
 
     await idExists.save();
 
-    let manager = await ManagerAuth.findOne({ email });
+    let manager = await Manager.findOne({ email });
 
     if (manager) {
       manager.email = email || manager.email;
@@ -427,10 +432,10 @@ const deleteRestaurant = async (req, res) => {
 
 const getRestaurantDetails = async (req, res) => {
   try {
-    const { owner_id, restaurant_id } = req.body;
-    if (!owner_id || !restaurant_id) {
+    const { owner_id, restaurant_id, manager_id } = req.body;
+    if (!owner_id || !restaurant_id || !manager_id) {
       return res.status(400).json({
-        message: "Missing required fields:owner_id, restaurant_id",
+        message: "Missing required fields:owner_id, restaurant_id, manager_id",
         success: false,
       });
     }
@@ -451,15 +456,40 @@ const getRestaurantDetails = async (req, res) => {
       });
     }
 
-    // const categories = await Category.find({ restaurant_id });
-    // const foods = await Food.find({ restaurant_id });
-    // const staff = await Staff.find({ restaurant_id });
-    // let manager = null;
-    // if (restaurant.manager_id) {
-    //   manager = await UserAuth.findById(restaurant.manager_id);
-    // } else {
-    //   manager = await UserAuth.findOne({ restaurant_id, role: "manager" });
-    // }
+    const managerList = await Manager.findOne({ user_id: manager_id });
+    if (!managerList) {
+      return res.status(400).json({
+        message: "Manager not found!",
+        success: false,
+      });
+    }
+
+    const manager = await UserAuth.findById(manager_id);
+    if (!manager) {
+      return res
+        .status(400)
+        .json({ message: "Manager user record not found!", success: false });
+    }
+
+    const restaurantDetails = {
+      _id: restaurant._id,
+      owner_id: restaurant.owner_id,
+      name: restaurant.name,
+      address: restaurant.address,
+      image: restaurant.image,
+      status: restaurant.status,
+      description: restaurant.description,
+      location: restaurant.location,
+      cuisine_type: restaurant.cuisine_type,
+    };
+
+    const managerDetails = {
+      _id: manager._id,
+      name: manager.name,
+      email: manager.email,
+      role: manager.role,
+      phone: restaurant.phone,
+    };
 
     const categories = [
       { _id: "cat1", name: "Appetizers", restaurant_id },
@@ -473,6 +503,8 @@ const getRestaurantDetails = async (req, res) => {
         price: 5.99,
         category_id: "cat1",
         restaurant_id,
+        image:
+          "https://img.freepik.com/free-photo/png-pieces-garlic-bread-isolated-white-background_185193-163495.jpg?t=st=1747836389~exp=1747839989~hmac=34f8af6a6b87148c75cf6c36413fa6dadfa883a004334b9741b61332cce48aca&w=1060",
       },
       {
         _id: "food2",
@@ -480,6 +512,8 @@ const getRestaurantDetails = async (req, res) => {
         price: 12.99,
         category_id: "cat2",
         restaurant_id,
+        image:
+          "https://img.freepik.com/free-psd/delicious-creamy-lobster-linguine-pasta-dish_191095-86356.jpg?t=st=1747836425~exp=1747840025~hmac=0d315337aeb3ca417b50af4723907075e61aeda937f0f7b227a0f9598bee0c19&w=1060",
       },
     ];
 
@@ -488,25 +522,18 @@ const getRestaurantDetails = async (req, res) => {
       { _id: "staff2", name: "Jane Smith", role: "waiter", restaurant_id },
     ];
 
-    const manager = {
-      _id: "static_manager_id",
-      name: "Alice Johnson",
-      email: "alice@bistro.com",
-      role: "manager",
-    };
-
-    const restaurantDetails = {
-      ...restaurant.toObject(),
+    const restaurantDetailsData = {
+      restaurantDetails,
       categories,
       foods,
       staff,
-      manager,
+      manager: managerDetails,
     };
 
     return res.status(200).json({
       message: "Restaurant details fetched successfully",
       success: true,
-      data: restaurantDetails,
+      data: restaurantDetailsData,
     });
   } catch (error) {
     console.error(err);
@@ -518,10 +545,47 @@ const getRestaurantDetails = async (req, res) => {
   }
 };
 
+const getRestaurantByManager = async (req, res) => {
+  try {
+    const { manager_id } = req.body;
+
+    const managerMap = await Manager.findOne({ user_id: manager_id });
+
+    if (!managerMap) {
+      return res.status(404).json({
+        message: "No restaurant assigned to this manager",
+        success: false,
+      });
+    }
+
+    const restaurant = await Restaurant.findById(managerMap.restaurant_id);
+
+    if (!restaurant) {
+      return res.status(404).json({
+        message: "Restaurant not found",
+        success: false,
+      });
+    }
+
+    res.status(200).json({
+      message: "Restaurant details fetched successfully",
+      success: true,
+      data: restaurant,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching restaurant details",
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getRestaurant,
   createRestaurant,
   updateRestaurant,
   deleteRestaurant,
   getRestaurantDetails,
+  getRestaurantByManager,
 };
