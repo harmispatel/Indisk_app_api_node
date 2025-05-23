@@ -2,8 +2,6 @@ const StaffData = require("../models/staff");
 const bcrypt = require("bcryptjs");
 const fs = require("fs");
 const path = require("path");
-const ManagerAuth = require("../models/manager");
-const Restaurant = require("../models/RestaurantCreate");
 const crypto = require("crypto");
 const UserAuth = require("../models/authLogin");
 const mongoose = require("mongoose");
@@ -59,12 +57,18 @@ const createStaff = async (req, res) => {
       gender,
       address,
       status,
-      isBlocked,
-      restaurant_id,
       manager_id,
     } = req.body;
 
-    if (!name || !email || !password || !restaurant_id || !manager_id) {
+    if (
+      !name ||
+      !email ||
+      !password ||
+      !phone ||
+      !gender ||
+      !manager_id ||
+      !status
+    ) {
       return res.status(400).json({
         message:
           "Missing required fields: name, email, password, restaurant_id, manager_id",
@@ -72,19 +76,19 @@ const createStaff = async (req, res) => {
       });
     }
 
-    const managerFound = await ManagerAuth.findById(manager_id);
+    const managerFound = await UserAuth.findById(manager_id);
     if (!managerFound) {
       return res
         .status(404)
         .json({ message: "Manager not found", success: false });
     }
 
-    const restaurantFound = await Restaurant.findById(restaurant_id);
-    if (!restaurantFound) {
-      return res
-        .status(404)
-        .json({ message: "Restaurant not found", success: false });
-    }
+    // const restaurantFound = await Restaurant.findById(restaurant_id);
+    // if (!restaurantFound) {
+    //   return res
+    //     .status(404)
+    //     .json({ message: "Restaurant not found", success: false });
+    // }
 
     const emailRegex = /\S+@\S+\.\S+/;
     if (!emailRegex.test(email)) {
@@ -125,9 +129,9 @@ const createStaff = async (req, res) => {
       email,
       password,
       phone,
-      address,
+      address: address?.length > 0 ? address : null,
+      gender,
       profile_picture: `${process.env.FRONTEND_URL}/assets/staff/${fileName}`,
-      restaurant_id,
       manager_id,
       status,
     });
@@ -159,12 +163,12 @@ const createStaff = async (req, res) => {
 
 const updateStaff = async (req, res) => {
   try {
-    const { id, name, username, phone, email, password, is_blocked } = req.body;
+    const { id, name, phone, gender, address, status, manager_id } = req.body;
 
-    if (!id) {
+    if (!id || !name || !phone || !gender || !manager_id || !status) {
       return res.status(400).json({
+        message: "Missing required fields",
         success: false,
-        message: "ID is missing",
       });
     }
 
@@ -173,40 +177,6 @@ const updateStaff = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Staff not found",
-      });
-    }
-
-    let profile_photo = existingStaff.profile_photo;
-    if (req.file) {
-      const oldFileName = path.basename(existingStaff.profile_photo);
-
-      const oldFilePath = path.join(__dirname, "../assets/staff", oldFileName);
-      if (fs.existsSync(oldFilePath)) {
-        fs.unlinkSync(oldFilePath);
-      }
-
-      profile_photo = `${process.env.FRONTEND_URL}/assets/staff/${req.file.filename}`;
-    }
-
-    if (
-      !name?.trim() ||
-      !username?.trim() ||
-      !phone?.trim() ||
-      !email?.trim() ||
-      !profile_photo ||
-      is_blocked === undefined
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Required fields are missing",
-      });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid email format",
       });
     }
 
@@ -219,42 +189,52 @@ const updateStaff = async (req, res) => {
 
     const duplicate = await StaffData.findOne({
       _id: { $ne: id },
-      $or: [{ email }, { username }],
+      $or: [{ phone }],
     });
 
     if (duplicate) {
       return res.status(409).json({
         success: false,
-        message: "Email or username already in use",
+        message: "Phone already in use",
       });
     }
 
-    let updatedPassword = existingStaff.password;
-    if (password && password.trim()) {
-      updatedPassword = await bcrypt.hash(password.trim(), 10);
+    if (existingStaff) {
+      const oldFileName = path.basename(existingStaff.profile_picture || "");
+      const oldFilePath = path.join(__dirname, "../assets/staff", oldFileName);
+
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+      }
+
+      const uniqueName = crypto.randomBytes(2).toString("hex");
+      const ext = path.extname(req.file.originalname);
+      const fileName = `${uniqueName}${ext}`;
+      const uploadDir = path.join(__dirname, "../assets/staff");
+
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      const filePath = path.join(uploadDir, fileName);
+      fs.writeFileSync(filePath, req.file.buffer);
+
+      existingStaff.profile_picture = `${process.env.FRONTEND_URL}/assets/staff/${fileName}`;
     }
 
-    const updatedStaff = await StaffData.findByIdAndUpdate(
-      id,
-      {
-        name: name.trim(),
-        username: username.trim(),
-        phone: phone.trim(),
-        email: email.trim().toLowerCase(),
-        password: updatedPassword,
-        profile_photo: profile_photo,
-        is_blocked,
-      },
-      { new: true }
-    );
+    existingStaff.manager_id = manager_id || existingStaff.manager_id;
+    existingStaff.name = name || existingStaff.name;
+    existingStaff.phone = phone || existingStaff.phone;
+    existingStaff.address = address || existingStaff.address;
+    existingStaff.status = status || existingStaff.status;
+    existingStaff.gender = gender || existingStaff.gender;
 
-    const staffData = updatedStaff.toObject();
-    // delete staffData.password;
+    await existingStaff.save();
 
     return res.status(200).json({
       success: true,
       message: "Staff updated successfully",
-      manager: staffData,
+      manager: existingStaff,
     });
   } catch (error) {
     console.error("Error updating staff:", error.message);

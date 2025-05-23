@@ -13,7 +13,7 @@ const StaffSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
   },
-  
+
   password: {
     type: String,
     required: true,
@@ -24,6 +24,7 @@ const StaffSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  gender: { type: String, enum: ["male", "female", "other"] },
 
   profile_picture: {
     type: String,
@@ -35,15 +36,9 @@ const StaffSchema = new mongoose.Schema({
     default: null,
   },
 
-  restaurant_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "restaurant",
-    required: true,
-  },
-
   manager_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Manager",
+    ref: "login",
     required: true,
   },
 
