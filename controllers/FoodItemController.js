@@ -1,4 +1,4 @@
-const foodCategorySchema = require("../models/foodCategory");
+const FoodCategorySchema = require("../models/foodCategory");
 const FoodItemSchema = require("../models/FoodItem");
 const fs = require("fs");
 const path = require("path");
@@ -6,48 +6,44 @@ const crypto = require("crypto");
 require("dotenv").config();
 const Restaurant = require("../models/RestaurantCreate");
 const UserAuth = require("../models/authLogin");
+const mongoose = require("mongoose");
+const Manager = require("../models/manager");
 
 const getFood = async (req, res) => {
   try {
-    const { food_category, user_id } = req.body;
+    const { manager_id } = req.body;
 
-    if (!user_id) {
+    if (!manager_id) {
       return res.status(400).json({
-        message: "user_id is required",
+        message: "manager_id is required",
         success: false,
       });
     }
 
-    const existingUser = await UserAuth.findById(user_id);
-    if (!existingUser) {
+    if (!mongoose.Types.ObjectId.isValid(manager_id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid manager_id format",
+      });
+    }
+
+    const manager = await Manager.findOne({ user_id: manager_id });
+    if (!manager) {
       return res.status(404).json({
-        message: "User not found",
+        message: "Manager not found",
         success: false,
       });
     }
 
-    let filter = {};
-    if (food_category) {
-      const existingCategory = await foodCategorySchema.findById(food_category);
-      if (!existingCategory) {
-        return res.status(404).json({
-          message: "Food category not found",
-          success: false,
-        });
-      }
-      filter.food_category = food_category;
-    }
-
-    const foodItems = await FoodItemSchema.find(filter).populate([
-      { path: "food_category", select: "name" },
-      { path: "restaurant_id", select: "name" },
-      { path: "created_by", select: "name email" },
-    ]);
+    const foodList = await FoodItemSchema.find({ created_by: manager_id })
+      .populate("category", "name")
+      .populate("created_by", "name")
+      .sort({ created_at: -1 });
 
     res.status(200).json({
       message: "Food list fetched successfully",
       success: true,
-      data: foodItems.length ? foodItems : [],
+      data: foodList,
     });
   } catch (err) {
     console.error("getFood error:", err);
@@ -63,61 +59,47 @@ const createFood = async (req, res) => {
   try {
     const {
       name,
-      unit,
-      available_qty,
-      content_per_single_item,
-      cooking_time,
-      preparations,
-      min_stock_required,
-      priority,
-      preparations_time,
-      time_unit,
-      shifting_constant,
-      food_category,
       description,
-      restaurant_id,
-      created_by,
       base_price,
       prices_by_quantity,
+      category,
+      is_available,
+      created_by,
+      unit,
+      total_qty,
+      available_qty,
     } = req.body;
 
-    const requiredFields = {
-      food_category,
-      name,
-      base_price,
-      restaurant_id,
-      created_by,
-    };
-
-    for (const [key, value] of Object.entries(requiredFields)) {
-      if (!value) {
-        return res.status(400).json({
-          message: `${key} is required`,
-          success: false,
-        });
-      }
-    }
-
-    const existingUser = await UserAuth.findById(created_by);
-    if (!existingUser) {
-      return res.status(404).json({
-        message: "User not found",
+    if (
+      !name ||
+      !base_price ||
+      !category ||
+      !is_available ||
+      !created_by ||
+      !unit ||
+      !total_qty ||
+      !available_qty ||
+      !req.file
+    ) {
+      return res.status(400).json({
+        message: "All fields required",
         success: false,
       });
     }
 
-    const existingRestaurant = await Restaurant.findById(restaurant_id);
-    if (!existingRestaurant) {
+    const restaurant = await Manager.findOne({ user_id: created_by });
+    if (!restaurant) {
       return res.status(404).json({
-        message: "Restaurant not found",
+        message: "Manager not found!",
         success: false,
       });
     }
 
     if (isNaN(base_price)) {
-      return res
-        .status(400)
-        .json({ message: "Base price must be a number", success: false });
+      return res.status(400).json({
+        message: "Base price must be a valid number",
+        success: false,
+      });
     }
 
     if (available_qty && !Number.isInteger(Number(available_qty))) {
@@ -127,39 +109,9 @@ const createFood = async (req, res) => {
       });
     }
 
-    if (min_stock_required && !Number.isInteger(Number(min_stock_required))) {
+    if (total_qty && !Number.isInteger(Number(total_qty))) {
       return res.status(400).json({
-        message: "Minimum stock required must be an integer",
-        success: false,
-      });
-    }
-
-    const existingCategory = await foodCategorySchema.findById(food_category);
-    if (!existingCategory) {
-      return res.status(404).json({
-        message: "Food category not found",
-        success: false,
-      });
-    }
-
-    const imageUrls = [];
-    const uploadDir = path.join(__dirname, "../assets/food");
-
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    if (req.files?.length > 0) {
-      for (const file of req.files) {
-        const uniqueId = crypto.randomBytes(2).toString("hex");
-        const fileName = `${uniqueId}${path.extname(file.originalname)}`;
-        const filePath = path.join(uploadDir, fileName);
-        fs.writeFileSync(filePath, file.buffer);
-        imageUrls.push(`${process.env.FRONTEND_URL}/assets/food/${fileName}`);
-      }
-    } else {
-      return res.status(400).json({
-        message: "Please upload at least one image",
+        message: "Total quantity must be an integer",
         success: false,
       });
     }
@@ -172,25 +124,55 @@ const createFood = async (req, res) => {
       }
     };
 
+    const parsedPrices = parseArray(prices_by_quantity);
+    if (!Array.isArray(parsedPrices)) {
+      return res.status(400).json({
+        message: "Invalid prices_by_quantity format",
+        success: false,
+      });
+    }
+
+    for (const item of parsedPrices) {
+      if (!item.quantity || isNaN(item.price)) {
+        return res.status(400).json({
+          message: "Each price entry must include valid quantity and price",
+          success: false,
+        });
+      }
+    }
+
+    const existingCategory = await FoodCategorySchema.findById({
+      _id: category,
+    });
+    if (!existingCategory) {
+      return res
+        .status(404)
+        .json({ message: "Category not found", success: false });
+    }
+
+    const uniqueName = crypto.randomBytes(2).toString("hex");
+    const fileName = `${uniqueName}${path.extname(req.file.originalname)}`;
+    const uploadDir = path.join(__dirname, "../assets/food");
+
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filePath = path.join(uploadDir, fileName);
+    fs.writeFileSync(filePath, req.file.buffer);
+
     const newFood = new FoodItemSchema({
       name,
-      unit,
-      available_qty,
-      content_per_single_item,
-      cooking_time,
-      preparations,
-      min_stock_required,
-      priority,
-      preparations_time,
-      time_unit,
-      shifting_constant,
       description,
-      food_category,
-      restaurant_id,
-      created_by,
       base_price,
-      prices_by_quantity: parseArray(prices_by_quantity),
-      image_url: imageUrls,
+      prices_by_quantity: parsedPrices,
+      category,
+      is_available: is_available ?? true,
+      created_by,
+      unit,
+      total_qty: total_qty ?? 1,
+      available_qty: available_qty ?? 1,
+      image: `${process.env.FRONTEND_URL}/assets/food/${fileName}` || "",
     });
 
     await newFood.save();
@@ -215,111 +197,146 @@ const updateFood = async (req, res) => {
     const {
       id,
       name,
-      unit,
-      available_qty,
-      content_per_single_item,
-      cooking_time,
-      preparations,
-      min_stock_required,
-      priority,
-      preparations_time,
-      time_unit,
-      shifting_constant,
       description,
-      food_category,
-      restaurant_id,
-      created_by,
       base_price,
+      prices_by_quantity,
+      category,
+      is_available,
+      created_by,
+      unit,
+      total_qty,
+      available_qty,
     } = req.body;
 
-    if (!id || !created_by) {
+    if (
+      !id ||
+      !name ||
+      !base_price ||
+      !category ||
+      !is_available ||
+      !created_by ||
+      !unit ||
+      !total_qty ||
+      !available_qty ||
+      !req.file
+    ) {
       return res.status(400).json({
-        message: "Food item ID and created_by (user ID) are required",
+        message: "All fields required",
         success: false,
       });
     }
 
-    const foodItem = await FoodItemSchema.findById(id);
-    if (!foodItem) {
+    const foodGet = await FoodItemSchema.findById(id);
+    if (!foodGet) {
       return res.status(404).json({
-        message: "Food item not found",
         success: false,
+        message: "Food not found",
       });
     }
 
-    const userExists = await UserAuth.findById(created_by);
-    if (!userExists) {
+    const restaurant = await Manager.findOne({ user_id: created_by });
+    if (!restaurant) {
       return res.status(404).json({
-        message: "User not found",
+        message: "Manager not found!",
         success: false,
       });
     }
 
-    const imageUrls = foodItem.image_url || [];
-    const uploadDir = path.join(__dirname, "../assets/food");
-
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    if (isNaN(base_price)) {
+      return res.status(400).json({
+        message: "Base price must be a valid number",
+        success: false,
+      });
     }
 
-    if (req.files?.length > 0) {
-      for (const imgUrl of imageUrls) {
-        const fileName = path.basename(imgUrl);
-        const filePath = path.join(uploadDir, fileName);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      }
+    if (available_qty && !Number.isInteger(Number(available_qty))) {
+      return res.status(400).json({
+        message: "Available quantity must be an integer",
+        success: false,
+      });
+    }
 
-      imageUrls.length = 0;
-
-      for (const file of req.files) {
-        const uniqueId = crypto.randomBytes(2).toString("hex");
-        const fileName = `${uniqueId}${path.extname(file.originalname)}`;
-        const filePath = path.join(uploadDir, fileName);
-        fs.writeFileSync(filePath, file.buffer);
-        imageUrls.push(`${process.env.FRONTEND_URL}/assets/food/${fileName}`);
-      }
+    if (total_qty && !Number.isInteger(Number(total_qty))) {
+      return res.status(400).json({
+        message: "Total quantity must be an integer",
+        success: false,
+      });
     }
 
     const parseArray = (val) => {
       try {
         return typeof val === "string" ? JSON.parse(val) : val;
-      } catch {
+      } catch (err) {
         return [];
       }
     };
 
-    const updateData = {
-      name,
-      unit,
-      available_qty,
-      content_per_single_item,
-      cooking_time,
-      preparations,
-      min_stock_required,
-      priority,
-      preparations_time,
-      description,
-      time_unit,
-      shifting_constant,
-      food_category,
-      restaurant_id,
-      base_price,
-      prices_by_quantity: parseArray(req.body.prices_by_quantity),
-      image_url: imageUrls,
-    };
+    const parsedPrices = parseArray(prices_by_quantity);
+    if (!Array.isArray(parsedPrices)) {
+      return res.status(400).json({
+        message: "Invalid prices_by_quantity format",
+        success: false,
+      });
+    }
 
-    Object.keys(updateData).forEach((key) => {
-      if (updateData[key] === undefined) delete updateData[key];
+    for (const item of parsedPrices) {
+      if (!item.quantity || isNaN(item.price)) {
+        return res.status(400).json({
+          message: "Each price entry must include valid quantity and price",
+          success: false,
+        });
+      }
+    }
+
+    const existingCategory = await FoodCategorySchema.findById({
+      _id: category,
     });
+    if (!existingCategory) {
+      return res
+        .status(404)
+        .json({ message: "Category not found", success: false });
+    }
 
-    await FoodItemSchema.findByIdAndUpdate(id, updateData, { new: true });
+    if (req.file) {
+      const oldFileName = path.basename(foodGet.image || "");
+      const oldFilePath = path.join(__dirname, "../assets/food", oldFileName);
+
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+      }
+
+      const uniqueName = crypto.randomBytes(2).toString("hex");
+      const ext = path.extname(req.file.originalname);
+      const fileName = `${uniqueName}${ext}`;
+      const uploadDir = path.join(__dirname, "../assets/food");
+
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      const filePath = path.join(uploadDir, fileName);
+      fs.writeFileSync(filePath, req.file.buffer);
+
+      foodGet.image = `${process.env.FRONTEND_URL}/assets/food/${fileName}`;
+    }
+
+    foodGet.name = name;
+    foodGet.description = description;
+    foodGet.base_price = base_price;
+    foodGet.category = category;
+    foodGet.is_available = is_available;
+    foodGet.created_by = created_by;
+    foodGet.unit = unit;
+    foodGet.total_qty = total_qty;
+    foodGet.available_qty = available_qty;
+    foodGet.parsedPrices = parsedPrices;
+
+    await foodGet.save();
 
     res.status(200).json({
       message: "Food item updated successfully",
       success: true,
-      data: updateData,
+      data: foodGet,
     });
   } catch (err) {
     console.error("Update Food Error:", err);
@@ -333,34 +350,29 @@ const updateFood = async (req, res) => {
 
 const deleteFood = async (req, res) => {
   try {
-    const { id, user_id } = req.body;
+    const { id } = req.body;
 
-    if (!id || !user_id) {
+    if (!id) {
       return res.status(400).json({
         success: false,
-        message: "Both ID and user_id are required",
+        message: "ID is required!",
       });
     }
 
-    const foodData = await FoodItemSchema.findOne({
-      _id: id,
-      created_by: user_id,
-    });
+    const foodData = await FoodItemSchema.findById(id);
 
     if (!foodData) {
       return res.status(404).json({
-        message: "Food not found for the given user_id",
+        message: "Food not found for the given ID",
         success: false,
       });
     }
 
-    if (foodData.images && foodData.images.length > 0) {
-      for (const imgUrl of foodData.images) {
-        const fileName = path.basename(imgUrl);
-        const filePath = path.join(__dirname, "../assets/food", fileName);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
+    if (foodData.image) {
+      const fileName = path.basename(foodData.image);
+      const filePath = path.join(__dirname, "../assets/food", fileName);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
       }
     }
 

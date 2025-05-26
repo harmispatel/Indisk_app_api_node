@@ -12,6 +12,11 @@ const foodCategorySchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    manager_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "login",
+      required: true,
+    },
     restaurant_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "restaurant",

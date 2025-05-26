@@ -5,6 +5,9 @@ const path = require("path");
 const crypto = require("crypto");
 const UserAuth = require("../models/authLogin");
 const mongoose = require("mongoose");
+const config = require("../config/nodemailer");
+const nodemailer = require("nodemailer");
+require("dotenv").config();
 
 const getStaff = async (req, res) => {
   try {
@@ -83,13 +86,6 @@ const createStaff = async (req, res) => {
         .json({ message: "Manager not found", success: false });
     }
 
-    // const restaurantFound = await Restaurant.findById(restaurant_id);
-    // if (!restaurantFound) {
-    //   return res
-    //     .status(404)
-    //     .json({ message: "Restaurant not found", success: false });
-    // }
-
     const emailRegex = /\S+@\S+\.\S+/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
@@ -145,6 +141,107 @@ const createStaff = async (req, res) => {
     });
     await staffPersonal.save();
 
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: {
+        user: config.emailUser,
+        pass: config.emailPassword,
+      },
+    });
+
+    const mailOptions = {
+      from: config.emailUser,
+      to: email,
+      secure: false,
+      subject: "Your Staff Account Login Credentials",
+      html: `
+  <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #eee; border-radius: 8px; background-color: #f9f9f9; color: #333;">
+    <h2 style="color: #2c3e50; border-bottom: 2px solid #e2e2e2; padding-bottom: 10px;">👋 Welcome to the Team!</h2>
+
+    <p style="font-size: 15px; line-height: 1.6;">
+      Hello <strong>${name}</strong>,<br>
+      You have been successfully added as a staff member to our platform. Please find your login credentials and profile details below.
+    </p>
+
+    <h3 style="margin-top: 25px; color: #34495e;">🔐 Login Credentials</h3>
+    <table style="width: 100%; font-size: 14px;">
+      <tr>
+        <td style="padding: 5px 0;"><strong>Email:</strong></td>
+        <td>${email}</td>
+      </tr>
+      <tr>
+        <td style="padding: 5px 0;"><strong>Password:</strong></td>
+        <td>${password}</td>
+      </tr>
+    </table>
+
+    <h3 style="margin-top: 25px; color: #34495e;">👤 Staff Profile</h3>
+    <table style="width: 100%; font-size: 14px;">
+      <tr>
+        <td style="padding: 5px 0;"><strong>Name:</strong></td>
+        <td>${name}</td>
+      </tr>
+      <tr>
+        <td style="padding: 5px 0;"><strong>Phone:</strong></td>
+        <td>${phone}</td>
+      </tr>
+      <tr>
+        <td style="padding: 5px 0;"><strong>Gender:</strong></td>
+        <td>${gender}</td>
+      </tr>
+      ${
+        address
+          ? `
+      <tr>
+        <td style="padding: 5px 0;"><strong>Address:</strong></td>
+        <td>${address}</td>
+      </tr>`
+          : ""
+      }
+    </table>
+
+    ${
+      fileName
+        ? `
+    <div style="margin: 20px 0;">
+      <strong style="display: block; margin-bottom: 10px;">📸 Profile Picture:</strong>
+      <img src="cid:profileImage" alt="Profile Image" style="width: 100%; max-width: 200px; border-radius: 5px;">
+    </div>
+    `
+        : ""
+    }
+
+    <p style="margin-top: 20px; font-size: 14px;">🔒 For your security, please change your password after logging in for the first time.</p>
+
+    <p style="margin-top: 30px; font-size: 14px;">
+      Welcome aboard!<br>
+      <strong>The Management Team</strong>
+    </p>
+  </div>
+`,
+
+      attachments: fileName
+        ? [
+            {
+              filename: "profile-picture.png",
+              path: `${process.env.FRONTEND_URL}/assets/staff/${fileName}`,
+              cid: "profileImage",
+            },
+          ]
+        : [],
+    };
+
+    transporter.sendMail(mailOptions, function (error) {
+      if (error) {
+        console.log(error);
+      } else {
+        console.log("Mail has been sent to your email");
+      }
+    });
+
     res.status(201).json({
       message: "Staff created successfully",
       success: true,
@@ -172,6 +269,13 @@ const updateStaff = async (req, res) => {
       });
     }
 
+    if (!/^\d{10}$/.test(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number must be exactly 10 digits",
+      });
+    }
+
     const existingStaff = await StaffData.findById(id);
     if (!existingStaff) {
       return res.status(404).json({
@@ -180,26 +284,19 @@ const updateStaff = async (req, res) => {
       });
     }
 
-    if (!/^\d{10}$/.test(phone)) {
-      return res.status(400).json({
-        success: false,
-        message: "Phone number must be exactly 10 digits",
-      });
-    }
-
     const duplicate = await StaffData.findOne({
       _id: { $ne: id },
-      $or: [{ phone }],
+      phone: phone,
     });
 
     if (duplicate) {
       return res.status(409).json({
         success: false,
-        message: "Phone already in use",
+        message: "Phone already in use by another staff member",
       });
     }
 
-    if (existingStaff) {
+    if (req.file) {
       const oldFileName = path.basename(existingStaff.profile_picture || "");
       const oldFilePath = path.join(__dirname, "../assets/staff", oldFileName);
 
@@ -222,19 +319,19 @@ const updateStaff = async (req, res) => {
       existingStaff.profile_picture = `${process.env.FRONTEND_URL}/assets/staff/${fileName}`;
     }
 
-    existingStaff.manager_id = manager_id || existingStaff.manager_id;
-    existingStaff.name = name || existingStaff.name;
-    existingStaff.phone = phone || existingStaff.phone;
-    existingStaff.address = address || existingStaff.address;
-    existingStaff.status = status || existingStaff.status;
-    existingStaff.gender = gender || existingStaff.gender;
+    existingStaff.name = name;
+    existingStaff.phone = phone;
+    existingStaff.gender = gender;
+    existingStaff.address = address || null;
+    existingStaff.status = status;
+    existingStaff.manager_id = manager_id;
 
     await existingStaff.save();
 
     return res.status(200).json({
       success: true,
       message: "Staff updated successfully",
-      manager: existingStaff,
+      data: existingStaff,
     });
   } catch (error) {
     console.error("Error updating staff:", error.message);

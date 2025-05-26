@@ -1,32 +1,45 @@
-const foodCategorySchema = require("../models/foodCategory");
+const FoodCategorySchema = require("../models/foodCategory");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
 const Restaurant = require("../models/RestaurantCreate");
 const crypto = require("crypto");
+const UserAuth = require("../models/authLogin");
+const mongoose = require("mongoose");
+const Manager = require("../models/manager");
 
 const getFoodCategory = async (req, res) => {
   try {
-    const { restaurant_id } = req.query;
+    const { manager_id } = req.body;
 
-    const existingRestaurant = await Restaurant.findById(restaurant_id);
-    if (!existingRestaurant) {
-      return res.status(404).json({
-        message: "Restaurant not found",
+    if (!manager_id) {
+      return res.status(400).json({
         success: false,
+        message: "manager_id is required",
       });
     }
 
-    const foodCategoryData = await foodCategorySchema.find({ restaurant_id });
+    if (!mongoose.Types.ObjectId.isValid(manager_id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid manager_id format",
+      });
+    }
+
+    const categoryData = await FoodCategorySchema.find({
+      manager_id: manager_id,
+    });
+
     res.status(200).json({
-      message: "Food categories fetched successfully",
       success: true,
-      data: foodCategoryData,
+      message: "Food categories fetched successfully",
+      data: categoryData,
     });
   } catch (err) {
+    console.error("Error fetching food categories:", err);
     res.status(500).json({
-      message: "Failed to retrieve food categories",
       success: false,
+      message: "Failed to retrieve food categories",
       error: err.message,
     });
   }
@@ -34,14 +47,23 @@ const getFoodCategory = async (req, res) => {
 
 const createFoodCategory = async (req, res) => {
   try {
-    const { name, description, restaurant_id, is_active } = req.body;
+    const { name, description, manager_id, is_active } = req.body;
 
-    if (!name || !restaurant_id || !req.file) {
+    if (!name || !manager_id || !req.file) {
       return res.status(400).json({
-        message: "Please provide name, restaurant_id and image file",
+        message: "Please provide name, manager_id and image file",
         success: false,
       });
     }
+    const restaurant = await Manager.findOne({ user_id: manager_id });
+    if (!restaurant) {
+      return res.status(404).json({
+        message: "Restaurant not found for this manager_id",
+        success: false,
+      });
+    }
+
+    const restaurant_id = restaurant.restaurant_id;
 
     const uniqueName = crypto.randomBytes(2).toString("hex");
     const fileName = `${uniqueName}${path.extname(req.file.originalname)}`;
@@ -54,9 +76,10 @@ const createFoodCategory = async (req, res) => {
     const filePath = path.join(uploadDir, fileName);
     fs.writeFileSync(filePath, req.file.buffer);
 
-    const newFoodCategory = new foodCategorySchema({
+    const newFoodCategory = new FoodCategorySchema({
       name,
       description: description || null,
+      manager_id,
       restaurant_id,
       is_active,
       image_url: `${process.env.FRONTEND_URL}/assets/category/${fileName}`,
@@ -80,7 +103,7 @@ const createFoodCategory = async (req, res) => {
 
 const updateFoodCategory = async (req, res) => {
   try {
-    const { id, name, description, restaurant_id, is_active } = req.body;
+    const { id, name, description, manager_id, is_active } = req.body;
 
     if (!id) {
       return res.status(400).json({
@@ -89,14 +112,14 @@ const updateFoodCategory = async (req, res) => {
       });
     }
 
-    if (!name && !restaurant_id && !description && !req.file) {
+    if (!name || !manager_id || !description || !req.file) {
       return res.status(400).json({
         message: "Please provide at least one field to update",
         success: false,
       });
     }
 
-    const foodCategoryGet = await foodCategorySchema.findById(id);
+    const foodCategoryGet = await FoodCategorySchema.findById(id);
     if (!foodCategoryGet) {
       return res.status(404).json({
         success: false,
@@ -104,11 +127,10 @@ const updateFoodCategory = async (req, res) => {
       });
     }
 
-    if (name !== undefined) foodCategoryGet.name = name;
-    if (description !== undefined) foodCategoryGet.description = description;
-    if (restaurant_id !== undefined)
-      foodCategoryGet.restaurant_id = restaurant_id;
-    if (is_active) foodCategoryGet.is_active = is_active;
+    foodCategoryGet.name = name;
+    foodCategoryGet.manager_id = manager_id;
+    foodCategoryGet.description = description || null;
+    foodCategoryGet.is_active = is_active;
 
     if (req.file) {
       const oldFileName = path.basename(foodCategoryGet.image_url || "");
@@ -164,7 +186,7 @@ const deleteFoodCategory = async (req, res) => {
       });
     }
 
-    const foodCategory = await foodCategorySchema.findById(id);
+    const foodCategory = await FoodCategorySchema.findById(id);
     if (!foodCategory) {
       return res.status(404).json({
         message: "Food category not found",
@@ -180,7 +202,7 @@ const deleteFoodCategory = async (req, res) => {
       }
     }
 
-    await foodCategorySchema.findByIdAndDelete(id);
+    await FoodCategorySchema.findByIdAndDelete(id);
 
     res.status(200).json({
       message: "Food category deleted successfully",

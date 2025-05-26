@@ -94,7 +94,7 @@ router.delete("/restaurant-delete", upload.none(), deleteRestaurant);
 router.post("/get-restaurant-details", upload.none(), getRestaurantDetails);
 router.post("/restaurant/manager", upload.none(), getRestaurantByManager);
 
-router.get("/food-category-list", getFoodCategory);
+router.post("/food-category-list", upload.none(), getFoodCategory);
 router.post(
   "/create-food-category",
   upload.single("image_url"),
@@ -108,8 +108,8 @@ router.put(
 router.delete("/delete-food-category", upload.none(), deleteFoodCategory);
 
 router.post("/get-food-list", upload.none(), getFood);
-router.post("/create-food", upload.array("image_url", 5), createFood);
-router.put("/update-food", upload.array("image_url", 5), updateFood);
+router.post("/create-food", upload.single("image"), createFood);
+router.put("/update-food", upload.single("image"), updateFood);
 router.delete("/delete-food", upload.none(), deleteFood);
 
 router.post("/get-food-stock-list", upload.none(), getFoodStock);
