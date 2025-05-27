@@ -4,46 +4,98 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 require("dotenv").config();
-const Restaurant = require("../models/RestaurantCreate");
-const UserAuth = require("../models/authLogin");
 const mongoose = require("mongoose");
 const Manager = require("../models/manager");
+const StaffData = require("../models/staff");
+const UserAuth = require("../models/authLogin");
 
 const getFood = async (req, res) => {
   try {
-    const { manager_id } = req.body;
+    const { manager_id, staff_id } = req.body;
 
-    if (!manager_id) {
+    let resolvedManagerId = null;
+    let isStaff = false;
+
+    // Case 1: Manager is logged in
+    if (manager_id) {
+      if (!mongoose.Types.ObjectId.isValid(manager_id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid manager_id format",
+        });
+      }
+
+      const manager = await Manager.findOne({ user_id: manager_id });
+      if (!manager) {
+        return res.status(404).json({
+          message: "Manager not found",
+          success: false,
+        });
+      }
+
+      resolvedManagerId = manager_id;
+    } else if (staff_id) {
+      if (!mongoose.Types.ObjectId.isValid(staff_id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid staff_id format",
+        });
+      }
+
+      const staff = await StaffData.findById(staff_id);
+      if (!staff) {
+        return res.status(404).json({
+          message: "Staff not found",
+          success: false,
+        });
+      }
+
+      resolvedManagerId = staff.manager_id;
+      isStaff = true;
+    } else {
       return res.status(400).json({
-        message: "manager_id is required",
+        message: "Either manager_id or staff_id is required",
         success: false,
       });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(manager_id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid manager_id format",
-      });
-    }
-
-    const manager = await Manager.findOne({ user_id: manager_id });
-    if (!manager) {
-      return res.status(404).json({
-        message: "Manager not found",
-        success: false,
-      });
-    }
-
-    const foodList = await FoodItemSchema.find({ created_by: manager_id })
+    const foodList = await FoodItemSchema.find({
+      created_by: resolvedManagerId,
+    })
       .populate("category", "name")
       .populate("created_by", "name")
       .sort({ created_at: -1 });
 
+    const user = await UserAuth.findById(staff_id).populate("cart.food_item");
+
+    let cartMap = {};
+    if (staff_id) {
+      const user = await UserAuth.findById(staff_id).populate("cart.food_item");
+      if (user && user.cart) {
+        user.cart.forEach((item) => {
+          if (item.food_item) {
+            cartMap[item.food_item._id.toString()] = item.quantity;
+          }
+        });
+      }
+    }
+
+    const filteredList = isStaff
+      ? foodList.map((item) => ({
+          id: item._id,
+          image: item.image,
+          name: item.name,
+          description: item.description,
+          price: item.base_price,
+          cartCount: cartMap[item._id.toString()] || 0,
+          isAvailable: item.is_available,
+        }))
+      : foodList;
+
     res.status(200).json({
       message: "Food list fetched successfully",
       success: true,
-      data: foodList,
+      data: filteredList,
     });
   } catch (err) {
     console.error("getFood error:", err);
@@ -79,10 +131,11 @@ const createFood = async (req, res) => {
       !unit ||
       !total_qty ||
       !available_qty ||
-      !req.file
+      !req.files ||
+      req?.files?.length === 0
     ) {
       return res.status(400).json({
-        message: "All fields required",
+        message: "All fields required and at least one image",
         success: false,
       });
     }
@@ -150,16 +203,19 @@ const createFood = async (req, res) => {
         .json({ message: "Category not found", success: false });
     }
 
-    const uniqueName = crypto.randomBytes(2).toString("hex");
-    const fileName = `${uniqueName}${path.extname(req.file.originalname)}`;
     const uploadDir = path.join(__dirname, "../assets/food");
-
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
 
-    const filePath = path.join(uploadDir, fileName);
-    fs.writeFileSync(filePath, req.file.buffer);
+    const imageUrls = [];
+    for (const file of req.files.slice(0, 5)) {
+      const uniqueName = crypto.randomBytes(2).toString("hex");
+      const fileName = `${uniqueName}${path.extname(file.originalname)}`;
+      const filePath = path.join(uploadDir, fileName);
+      fs.writeFileSync(filePath, file.buffer);
+      imageUrls.push(`${process.env.FRONTEND_URL}/assets/food/${fileName}`);
+    }
 
     const newFood = new FoodItemSchema({
       name,
@@ -172,7 +228,7 @@ const createFood = async (req, res) => {
       unit,
       total_qty: total_qty ?? 1,
       available_qty: available_qty ?? 1,
-      image: `${process.env.FRONTEND_URL}/assets/food/${fileName}` || "",
+      image: imageUrls,
     });
 
     await newFood.save();
@@ -297,27 +353,34 @@ const updateFood = async (req, res) => {
         .json({ message: "Category not found", success: false });
     }
 
-    if (req.file) {
-      const oldFileName = path.basename(foodGet.image || "");
-      const oldFilePath = path.join(__dirname, "../assets/food", oldFileName);
-
-      if (fs.existsSync(oldFilePath)) {
-        fs.unlinkSync(oldFilePath);
-      }
-
-      const uniqueName = crypto.randomBytes(2).toString("hex");
-      const ext = path.extname(req.file.originalname);
-      const fileName = `${uniqueName}${ext}`;
+    if (req.files && req.files.length > 0) {
       const uploadDir = path.join(__dirname, "../assets/food");
 
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
+      if (Array.isArray(foodItem.images)) {
+        for (const imgUrl of foodItem.images) {
+          const oldFileName = path.basename(imgUrl);
+          const oldFilePath = path.join(uploadDir, oldFileName);
+          if (fs.existsSync(oldFilePath)) {
+            await fsPromises.unlink(oldFilePath);
+          }
+        }
       }
 
-      const filePath = path.join(uploadDir, fileName);
-      fs.writeFileSync(filePath, req.file.buffer);
+      const imageUrls = [];
+      for (const file of req.files) {
+        const uniqueName = crypto.randomBytes(2).toString("hex");
+        const ext = path.extname(file.originalname);
+        const fileName = `${uniqueName}${ext}`;
+        const filePath = path.join(uploadDir, fileName);
 
-      foodGet.image = `${process.env.FRONTEND_URL}/assets/food/${fileName}`;
+        await fsPromises.mkdir(uploadDir, { recursive: true });
+        await fsPromises.writeFile(filePath, file.buffer);
+
+        const imageUrl = `${process.env.FRONTEND_URL}/assets/food/${fileName}`;
+        imageUrls.push(imageUrl);
+      }
+
+      foodItem.images = imageUrls;
     }
 
     foodGet.name = name;
@@ -368,12 +431,14 @@ const deleteFood = async (req, res) => {
       });
     }
 
-    if (foodData.image) {
-      const fileName = path.basename(foodData.image);
-      const filePath = path.join(__dirname, "../assets/food", fileName);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+    if (Array.isArray(foodData.image)) {
+      foodData.image.forEach((imageUrl) => {
+        const fileName = path.basename(imageUrl);
+        const filePath = path.join(__dirname, "../assets/food", fileName);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      });
     }
 
     await FoodItemSchema.findByIdAndDelete(id);

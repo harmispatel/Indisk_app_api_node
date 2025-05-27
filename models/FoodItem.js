@@ -26,7 +26,7 @@ const FoodItemSchema = new mongoose.Schema(
     total_qty: { type: Number, default: 1 },
     available_qty: { type: Number, default: 1 },
     image: {
-      type: String,
+      type: Array,
     },
   },
   { timestamps: true }

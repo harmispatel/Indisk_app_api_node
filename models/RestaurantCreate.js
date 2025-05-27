@@ -6,6 +6,9 @@ const restaurantSchema = new mongoose.Schema({
     ref: "login",
     required: true,
   },
+  manager_id: {
+    type: String,
+  },
   email: {
     type: String,
     required: true,

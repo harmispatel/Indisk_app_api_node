@@ -120,7 +120,10 @@ const createStaff = async (req, res) => {
     const filePath = path.join(uploadDir, fileName);
     fs.writeFileSync(filePath, req.file.buffer);
 
+    const sharedId = new mongoose.Types.ObjectId();
+
     const newStaff = new StaffData({
+      _id: sharedId,
       name,
       email,
       password,
@@ -135,6 +138,7 @@ const createStaff = async (req, res) => {
     await newStaff.save();
 
     const staffPersonal = new UserAuth({
+      _id: sharedId,
       email,
       password,
       role: "staff",

@@ -7,6 +7,7 @@ require("dotenv").config();
 const config = require("../config/nodemailer");
 const nodemailer = require("nodemailer");
 const Manager = require("../models/manager");
+const mongoose = require("mongoose");
 
 const getRestaurant = async (req, res) => {
   try {
@@ -99,22 +100,18 @@ const createRestaurant = async (req, res) => {
     const filePath = path.join(uploadDir, fileName);
     fs.writeFileSync(filePath, req.file.buffer);
 
+    const sharedId = new mongoose.Types.ObjectId();
+
     const manager = new UserAuth({
+      _id: sharedId,
       email,
       password,
       role: "manager",
     });
     await manager.save();
 
-    const managerDetails = new Manager({
-      user_id: manager._id,
-      restaurant_id: newRestaurant._id,
-      assigned_by: owner_id,
-      restaurant: newRestaurant,
-    });
-    await managerDetails.save();
-
     const newRestaurant = new Restaurant({
+      manager_id: sharedId,
       owner_id,
       email,
       password,
@@ -129,6 +126,14 @@ const createRestaurant = async (req, res) => {
     });
 
     await newRestaurant.save();
+
+    const managerDetails = new Manager({
+      user_id: manager._id,
+      restaurant_id: newRestaurant._id,
+      assigned_by: owner_id,
+      restaurant: newRestaurant,
+    });
+    await managerDetails.save();
 
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",

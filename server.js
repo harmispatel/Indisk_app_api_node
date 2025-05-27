@@ -6,6 +6,8 @@ const errorMiddleware = require("./middlewares/errorMiddleware");
 const cors = require("cors");
 const NodeCache = require("node-cache");
 const path = require("path");
+const OrderModel = require("./models/Order");
+const UserAuth = require("./models/authLogin");
 
 dotenv.config();
 
@@ -29,6 +31,60 @@ const cache = new NodeCache();
 app.delete("/api/cache/clear", (req, res) => {
   cache.flushAll();
   res.status(200).json({ message: "Cache cleared successfully!" });
+});
+
+app.post("/api/viva-webhook", async (req, res) => {
+  try {
+    const { orderCode, status } = req.body;
+
+    if (!orderCode) {
+      return res.status(400).send("Missing orderCode");
+    }
+
+    const order = await OrderModel.findOne({ viva_order_code: orderCode });
+    if (!order) {
+      return res.status(404).send("Order not found");
+    }
+
+    if (status === "paid") {
+      order.payment_status = "paid";
+      order.status = "Completed";
+      await order.save();
+
+      // Clear user cart after successful payment
+      await UserAuth.findByIdAndUpdate(order.user, { cart: [] });
+    } else if (status === "failed") {
+      order.payment_status = "failed";
+      order.status = "Cancelled";
+      await order.save();
+    }
+
+    // Respond OK to Viva Wallet
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error("Webhook error:", error);
+    res.status(500).send("Server error");
+  }
+});
+
+app.get("/api/order-status/:orderCode", async (req, res) => {
+  try {
+    const { orderCode } = req.params;
+    const order = await OrderModel.findOne({ viva_order_code: orderCode });
+    if (!order) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
+    }
+    res.json({
+      success: true,
+      payment_status: order.payment_status,
+      order_status: order.status,
+      order,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 app.use("/api", routes);

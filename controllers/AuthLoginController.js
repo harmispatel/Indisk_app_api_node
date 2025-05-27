@@ -359,9 +359,13 @@ const editProfile = async (req, res) => {
     if (username) user.username = username;
     if (gender) user.gender = gender;
 
-   if (req.file) {
+    if (req.file) {
       const oldFileName = path.basename(user.image || "");
-      const oldFilePath = path.join(__dirname, "../assets/profile", oldFileName);
+      const oldFilePath = path.join(
+        __dirname,
+        "../assets/profile",
+        oldFileName
+      );
 
       if (user.image && fs.existsSync(oldFilePath)) {
         fs.unlinkSync(oldFilePath);
@@ -383,7 +387,8 @@ const editProfile = async (req, res) => {
     }
 
     if (!user.image) {
-      user.image = "https://cdn3.iconfinder.com/data/icons/avatars-collection/256/22-512.png";
+      user.image =
+        "https://cdn3.iconfinder.com/data/icons/avatars-collection/256/22-512.png";
     }
 
     await user.save();

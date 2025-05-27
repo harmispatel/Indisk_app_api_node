@@ -64,6 +64,14 @@ const {
 } = require("../controllers/SubCategoryController");
 
 const { getOwnerHome } = require("../controllers/OwnerHomeController");
+const {
+  getCart,
+  addToCart,
+  removeFromCart,
+  clearCart,
+  placeOrder,
+  updateQuantity,
+} = require("../controllers/CartController");
 
 router.get("/auth-user-list", getAuthUsers);
 router.post("/login", upload.none(), loginUser);
@@ -108,8 +116,8 @@ router.put(
 router.delete("/delete-food-category", upload.none(), deleteFoodCategory);
 
 router.post("/get-food-list", upload.none(), getFood);
-router.post("/create-food", upload.single("image"), createFood);
-router.put("/update-food", upload.single("image"), updateFood);
+router.post("/create-food", upload.array("image", 5), createFood);
+router.put("/update-food", upload.array("image", 5), updateFood);
 router.delete("/delete-food", upload.none(), deleteFood);
 
 router.post("/get-food-stock-list", upload.none(), getFoodStock);
@@ -127,5 +135,12 @@ router.post("/get-sub-category", upload.none(), getSubCategory),
   router.delete("/delete-sub-category", upload.none(), deleteSubCategory);
 
 router.post("/get-owner-home", upload.none(), getOwnerHome);
+
+router.post("/get-cart", upload.none(), getCart);
+router.post("/add-to-cart", upload.none(), addToCart);
+router.post("/update-quantity", upload.none(), updateQuantity);
+router.post("/remove-to-cart", upload.none(), removeFromCart);
+router.post("/clear-cart", upload.none(), clearCart);
+router.post("/place-order", upload.none(), placeOrder);
 
 module.exports = router;
