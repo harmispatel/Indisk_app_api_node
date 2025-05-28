@@ -33,33 +33,21 @@ app.delete("/api/cache/clear", (req, res) => {
   res.status(200).json({ message: "Cache cleared successfully!" });
 });
 
-app.post("/api/viva-webhook", async (req, res) => {
+app.post("/api/viva/webhook", async (req, res) => {
   try {
-    const { orderCode, status } = req.body;
+    const { EventData } = req.body;
+    const orderCode = EventData?.OrderCode;
+    const statusId = EventData?.StatusId;
 
-    if (!orderCode) {
-      return res.status(400).send("Missing orderCode");
-    }
+    if (!orderCode) return res.status(400).send("No order code found!");
 
     const order = await OrderModel.findOne({ viva_order_code: orderCode });
-    if (!order) {
-      return res.status(404).send("Order not found");
-    }
-
-    if (status === "paid") {
-      order.payment_status = "paid";
-      order.status = "Completed";
-      await order.save();
-
-      // Clear user cart after successful payment
-      await UserAuth.findByIdAndUpdate(order.user, { cart: [] });
-    } else if (status === "failed") {
-      order.payment_status = "failed";
-      order.status = "Cancelled";
+    if (order) {
+      order.payment_status = statusId === "F" ? "paid" : "failed";
+      order.status = statusId === "F" ? "Confirmed" : "Failed";
       await order.save();
     }
 
-    // Respond OK to Viva Wallet
     res.status(200).send("OK");
   } catch (error) {
     console.error("Webhook error:", error);
