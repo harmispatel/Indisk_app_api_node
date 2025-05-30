@@ -4,7 +4,7 @@ const createVivaOrder = async (amount, description, reference) => {
   try {
     const clientId =
       "ur8a0rsy8ts6jq2tnor8vtsgmgsickzy74gppffuzt406.apps.vivapayments.com";
-    const clientSecret = "UR73x347v0zeEVrs4M9m8U030AdhqH";
+    const clientSecret = "oXTYAtjB40y8TCqBe70g2qEad4igsB";
 
     const tokenResponse = await axios.post(
       "https://demo-accounts.vivapayments.com/connect/token",
@@ -26,11 +26,11 @@ const createVivaOrder = async (amount, description, reference) => {
     const orderResponse = await axios.post(
       "https://demo-api.vivapayments.com/checkout/v2/orders",
       {
-        amount,
+        amount: 1000,
         customerTrns: description,
         reference,
-        successUrl: "https://yourdomain.com/payment-success",
-        failureUrl: "https://yourdomain.com/payment-failure",
+        successUrl: "https://indisk-app.harmistechnology.com/payment-success",
+        failureUrl: "https://indisk-app.harmistechnology.com/payment-failure",
       },
       {
         headers: {

@@ -7,7 +7,6 @@ const cors = require("cors");
 const NodeCache = require("node-cache");
 const path = require("path");
 const OrderModel = require("./models/Order");
-const UserAuth = require("./models/authLogin");
 
 dotenv.config();
 
@@ -33,26 +32,8 @@ app.delete("/api/cache/clear", (req, res) => {
   res.status(200).json({ message: "Cache cleared successfully!" });
 });
 
-app.post("/api/viva/webhook", async (req, res) => {
-  try {
-    const { EventData } = req.body;
-    const orderCode = EventData?.OrderCode;
-    const statusId = EventData?.StatusId;
-
-    if (!orderCode) return res.status(400).send("No order code found!");
-
-    const order = await OrderModel.findOne({ viva_order_code: orderCode });
-    if (order) {
-      order.payment_status = statusId === "F" ? "paid" : "failed";
-      order.status = statusId === "F" ? "Confirmed" : "Failed";
-      await order.save();
-    }
-
-    res.status(200).send("OK");
-  } catch (error) {
-    console.error("Webhook error:", error);
-    res.status(500).send("Server error");
-  }
+app.get("/api/viva/webhook", (req, res) => {
+  res.status(200).send("Webhook endpoint is live");
 });
 
 app.get("/api/order-status/:orderCode", async (req, res) => {

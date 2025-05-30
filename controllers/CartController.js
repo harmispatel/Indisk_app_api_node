@@ -305,7 +305,7 @@ const placeOrder = async (req, res) => {
       payment_type: isViva ? "viva" : "cash",
       payment_status: "pending",
       status: "Pending",
-      order_date: formattedOrderDate,
+      order_date: new Date(),
       total_amount: totalAmountOver,
     };
 
@@ -326,7 +326,7 @@ const placeOrder = async (req, res) => {
         payment_type: "viva",
         payment_status: "pending",
         status: "Pending",
-        order_date: formattedOrderDate,
+        order_date: new Date(),
         total_amount: totalAmount,
         viva_order_code: vivaOrder.orderCode,
       });
