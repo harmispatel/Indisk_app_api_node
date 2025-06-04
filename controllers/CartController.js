@@ -3,26 +3,6 @@ const FoodItemSchema = require("../models/FoodItem");
 const OrderModel = require("../models/Order");
 const { createVivaOrder } = require("../utils/vivaWallet");
 
-const order_date = new Date();
-
-const formatOrderDate = (date) => {
-  const padZero = (num) => String(num).padStart(2, "0");
-
-  const day = padZero(date.getDate());
-  const month = padZero(date.getMonth() + 1);
-  const year = date.getFullYear();
-
-  let hours = date.getHours();
-  const minutes = padZero(date.getMinutes());
-  const ampm = hours >= 12 ? "PM" : "AM";
-
-  hours = hours % 12 || 12;
-
-  return `${day}-${month}-${year} ${padZero(hours)}:${minutes} ${ampm}`;
-};
-
-const formattedOrderDate = formatOrderDate(order_date);
-
 const getCart = async (req, res) => {
   try {
     const { user_id } = req.body;

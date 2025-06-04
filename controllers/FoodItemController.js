@@ -8,6 +8,7 @@ const mongoose = require("mongoose");
 const Manager = require("../models/manager");
 const StaffData = require("../models/staff");
 const UserAuth = require("../models/authLogin");
+const fsPromises = require('fs').promises
 
 const getFood = async (req, res) => {
   try {
@@ -274,7 +275,8 @@ const updateFood = async (req, res) => {
       !unit ||
       !total_qty ||
       !available_qty ||
-      !req.file
+      !req.files ||
+      req?.files?.length === 0
     ) {
       return res.status(400).json({
         message: "All fields required",
@@ -356,8 +358,8 @@ const updateFood = async (req, res) => {
     if (req.files && req.files.length > 0) {
       const uploadDir = path.join(__dirname, "../assets/food");
 
-      if (Array.isArray(foodItem.images)) {
-        for (const imgUrl of foodItem.images) {
+      if (Array.isArray(foodGet.image)) {
+        for (const imgUrl of foodGet.image) {
           const oldFileName = path.basename(imgUrl);
           const oldFilePath = path.join(uploadDir, oldFileName);
           if (fs.existsSync(oldFilePath)) {
@@ -380,7 +382,7 @@ const updateFood = async (req, res) => {
         imageUrls.push(imageUrl);
       }
 
-      foodItem.images = imageUrls;
+      foodGet.image = imageUrls;
     }
 
     foodGet.name = name;

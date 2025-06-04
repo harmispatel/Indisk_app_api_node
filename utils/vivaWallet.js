@@ -47,6 +47,8 @@ const createVivaOrder = async (amount, description, reference) => {
     };
   } catch (error) {
     console.error("Viva Wallet API error:", {
+      config: error.config,
+      request: error.request,
       status: error.response?.status,
       data: error.response?.data,
       headers: error.response?.headers,
