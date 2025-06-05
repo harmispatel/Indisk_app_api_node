@@ -90,6 +90,8 @@ const getFood = async (req, res) => {
           price: item.base_price,
           cartCount: cartMap[item._id.toString()] || 0,
           isAvailable: item.is_available,
+          category: item.category,
+
         }))
       : foodList;
 
@@ -97,6 +99,7 @@ const getFood = async (req, res) => {
       message: "Food list fetched successfully",
       success: true,
       data: filteredList,
+      
     });
   } catch (err) {
     console.error("getFood error:", err);

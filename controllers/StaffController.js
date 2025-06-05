@@ -61,6 +61,7 @@ const createStaff = async (req, res) => {
       address,
       status,
       manager_id,
+      role,
     } = req.body;
 
     if (
@@ -70,11 +71,12 @@ const createStaff = async (req, res) => {
       !phone ||
       !gender ||
       !manager_id ||
-      !status
+      !status ||
+      !role
     ) {
       return res.status(400).json({
         message:
-          "Missing required fields: name, email, password, restaurant_id, manager_id",
+          "Missing required fields: name, email, password, restaurant_id, manager_id, role",
         success: false,
       });
     }

@@ -7,27 +7,59 @@ const crypto = require("crypto");
 const UserAuth = require("../models/authLogin");
 const mongoose = require("mongoose");
 const Manager = require("../models/manager");
+const StaffData = require("../models/staff");
 
 const getFoodCategory = async (req, res) => {
   try {
-    const { manager_id } = req.body;
+    const { manager_id, staff_id } = req.body;
 
-    if (!manager_id) {
+    let resolvedManagerId = null;
+
+    // Validate and resolve manager_id or staff_id
+    if (manager_id) {
+      if (!mongoose.Types.ObjectId.isValid(manager_id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid manager_id format",
+        });
+      }
+
+      const manager = await Manager.findOne({ user_id: manager_id });
+      if (!manager) {
+        return res.status(404).json({
+          success: false,
+          message: "Manager not found",
+        });
+      }
+
+      resolvedManagerId = manager_id;
+    } else if (staff_id) {
+      if (!mongoose.Types.ObjectId.isValid(staff_id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid staff_id format",
+        });
+      }
+
+      const staff = await StaffData.findById(staff_id);
+      if (!staff) {
+        return res.status(404).json({
+          success: false,
+          message: "Staff not found",
+        });
+      }
+
+      resolvedManagerId = staff.manager_id;
+    } else {
       return res.status(400).json({
         success: false,
-        message: "manager_id is required",
+        message: "Either manager_id or staff_id is required",
       });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(manager_id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid manager_id format",
-      });
-    }
-
+    // Fetch categories using resolvedManagerId
     const categoryData = await FoodCategorySchema.find({
-      manager_id: manager_id,
+      manager_id: resolvedManagerId,
     });
 
     res.status(200).json({
@@ -44,6 +76,7 @@ const getFoodCategory = async (req, res) => {
     });
   }
 };
+
 
 const createFoodCategory = async (req, res) => {
   try {

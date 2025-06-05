@@ -20,7 +20,7 @@ const AuthData = mongoose.model(
     password: String,
     role: {
       type: String,
-      enum: ["owner", "manager", "staff"],
+      enum: ["owner", "manager", "staff", "kitchenStaff"],
       required: true,
     },
     username: { type: String },

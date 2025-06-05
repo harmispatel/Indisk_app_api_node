@@ -7,7 +7,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const path = require("path");
 
-const allowedRoles = ["owner", "manager", "staff"];
+const allowedRoles = ["owner", "manager", "staff", "kitchenStaff"];
 
 const getAuthUsers = async (req, res) => {
   try {
@@ -63,11 +63,8 @@ const registerUser = async (req, res) => {
         .json({ message: "Email is already registered", success: false });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
     const newUser = new UserAuth({
       email,
-      // password: hashedPassword,
       password,
       role,
     });
