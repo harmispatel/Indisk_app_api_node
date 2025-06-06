@@ -43,7 +43,7 @@ const OrderSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  // total_amount: { type: Number, required: true },
+  total_amount: { type: String },
   viva_order_code: {
     type: String,
   },

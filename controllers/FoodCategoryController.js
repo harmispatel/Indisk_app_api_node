@@ -2,9 +2,7 @@ const FoodCategorySchema = require("../models/foodCategory");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
-const Restaurant = require("../models/RestaurantCreate");
 const crypto = require("crypto");
-const UserAuth = require("../models/authLogin");
 const mongoose = require("mongoose");
 const Manager = require("../models/manager");
 const StaffData = require("../models/staff");
@@ -15,7 +13,6 @@ const getFoodCategory = async (req, res) => {
 
     let resolvedManagerId = null;
 
-    // Validate and resolve manager_id or staff_id
     if (manager_id) {
       if (!mongoose.Types.ObjectId.isValid(manager_id)) {
         return res.status(400).json({
@@ -57,7 +54,6 @@ const getFoodCategory = async (req, res) => {
       });
     }
 
-    // Fetch categories using resolvedManagerId
     const categoryData = await FoodCategorySchema.find({
       manager_id: resolvedManagerId,
     });
@@ -68,7 +64,6 @@ const getFoodCategory = async (req, res) => {
       data: categoryData,
     });
   } catch (err) {
-    console.error("Error fetching food categories:", err);
     res.status(500).json({
       success: false,
       message: "Failed to retrieve food categories",

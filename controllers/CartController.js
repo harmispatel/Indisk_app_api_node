@@ -2,75 +2,83 @@ const UserAuth = require("../models/authLogin");
 const FoodItemSchema = require("../models/FoodItem");
 const OrderModel = require("../models/Order");
 const { createVivaOrder } = require("../utils/vivaWallet");
+const Cart = require("../models/CartModel");
 
 const getCart = async (req, res) => {
   try {
     const { user_id } = req.body;
 
-    if (!user_id)
+    if (!user_id) {
       return res
         .status(400)
-        .json({ success: false, message: "user_id required" });
+        .json({ success: false, message: "user_id is required" });
+    }
 
-    const user = await UserAuth.findById(user_id).populate("cart.food_item");
-    if (!user)
+    const user = await UserAuth.findById(user_id);
+    if (!user) {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
+    }
 
-    const cartDetails = user.cart
-      .map((item) => {
-        const food = item.food_item;
-        if (!food) return null;
+    const cart = await Cart.findOne({ user_id }).populate("items.product_id");
+    if (!cart || cart.items.length === 0) {
+      return res
+        .status(200)
+        .json({ success: true, message: "Cart is empty", cart: [] });
+    }
 
-        return {
-          food_item_id: food._id,
-          image: food.image,
-          product_name: food.name,
-          price: food.base_price,
-          quantity: item.quantity,
-          total_price: food.base_price * item.quantity,
-        };
-      })
-      .filter(Boolean);
+    const cartDetails = cart.items.map((item) => {
+      const food = item.product_id;
+      return {
+        food_item_id: food._id,
+        image: food.image,
+        product_name: food.name,
+        price: food.base_price,
+        quantity: item.quantity,
+        total_price: food.base_price * item.quantity,
+      };
+    });
 
-    const totalPrice = cartDetails.reduce(
+    const subtotal = cartDetails.reduce(
       (acc, item) => acc + item.total_price,
       0
     );
-
     const totalQuantity = cartDetails.reduce(
       (acc, item) => acc + item.quantity,
       0
     );
-
-    const gstAmount = +(totalPrice * 0.05).toFixed(2);
-    const grandTotal = +(totalPrice + gstAmount).toFixed(2);
+    const gstAmount = +(subtotal * 0.05).toFixed(2);
+    const grandTotal = +(subtotal + gstAmount).toFixed(2);
 
     res.status(200).json({
       success: true,
-      message: "Cart list fetched successfully",
+      message: "Cart fetched successfully",
       cart: cartDetails,
       total_quantity: totalQuantity,
-      subtotal: totalPrice,
+      subtotal,
       gst_5_percent: gstAmount,
       total_with_gst: grandTotal,
     });
   } catch (err) {
+    console.error("Error in getCart:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
 const addToCart = async (req, res) => {
   try {
-    const { user_id, product_id } = req.body;
+    let { user_id, product_id, quantity } = req.body;
 
-    if (!user_id || !product_id) {
+    if (!user_id || !product_id || !quantity) {
       return res.status(400).json({
         success: false,
-        message: "user_id and product_id are required",
+        message: "user_id, product_id, and valid quantity are required",
       });
     }
+
+    quantity = parseInt(quantity) || 1;
+    if (quantity < 1) quantity = 1;
 
     const user = await UserAuth.findById(user_id);
     if (!user) {
@@ -87,17 +95,26 @@ const addToCart = async (req, res) => {
       });
     }
 
-    const index = user.cart.findIndex(
-      (ci) => ci.food_item.toString() === product_id
-    );
-    if (index > -1) {
-      user.cart[index].quantity += 1;
+    let cart = await Cart.findOne({ user_id: user_id });
+
+    if (!cart) {
+      cart = new Cart({
+        user_id: user_id,
+        items: [{ product_id: product_id, quantity }],
+      });
     } else {
-      user.cart.push({ food_item: product_id, quantity: 1 });
+      const itemIndex = cart.items.findIndex(
+        (item) => item.product_id.toString() === product_id
+      );
+
+      if (itemIndex > -1) {
+        cart.items[itemIndex].quantity += quantity;
+      } else {
+        cart.items.push({ product_id, quantity });
+      }
     }
 
-    await user.save();
-    await user.populate("cart.food_item");
+    await cart.save();
 
     res.status(200).json({
       success: true,
@@ -121,58 +138,53 @@ const updateQuantity = async (req, res) => {
       });
     }
 
-    const user = await UserAuth.findById(user_id);
-    if (!user) {
+    const cart = await Cart.findOne({ user_id }).populate("items.product_id");
+
+    if (!cart) {
       return res
         .status(404)
-        .json({ success: false, message: "User not found" });
+        .json({ success: false, message: "Cart not found for user" });
     }
 
-    const item = user.cart.find((ci) => ci.food_item.toString() === product_id);
+    const itemIndex = cart.items.findIndex(
+      (item) => item.product_id._id.toString() === product_id
+    );
 
-    if (!item) {
+    if (itemIndex === -1) {
       return res
         .status(404)
         .json({ success: false, message: "Item not found in cart" });
     }
 
     if (type === "increase") {
-      item.quantity += 1;
+      cart.items[itemIndex].quantity += 1;
     } else if (type === "decrease") {
-      if (item.quantity > 1) {
-        item.quantity -= 1;
+      if (cart.items[itemIndex].quantity > 1) {
+        cart.items[itemIndex].quantity -= 1;
       } else {
-        // Remove item from cart if quantity would become 0
-        user.cart = user.cart.filter(
-          (ci) => ci.food_item.toString() !== product_id
-        );
+        cart.items.splice(itemIndex, 1);
       }
     }
 
-    await user.save();
-    await user.populate("cart.food_item");
+    await cart.save();
 
-    const cartDetails = user.cart.map((item) => {
-      const food = item.food_item;
+    await cart.populate("items.product_id");
+
+    const cartDetails = cart.items.map((item) => {
+      const product = item.product_id;
       return {
-        food_item_id: food._id,
-        image: food.image,
-        product_name: food.name,
-        price: food.base_price,
+        food_item_id: product._id,
+        image: product.image,
+        product_name: product.name,
+        price: product.base_price,
         quantity: item.quantity,
-        total_price: food.base_price * item.quantity,
+        total_price: product.base_price * item.quantity,
       };
     });
 
     res.status(200).json({
       success: true,
       message: `Quantity ${type === "increase" ? "increased" : "decreased"}!`,
-      cart: cartDetails,
-      total_cart_price: cartDetails.reduce(
-        (acc, item) => acc + item.total_price,
-        0
-      ),
-      total_quantity: cartDetails.reduce((acc, item) => acc + item.quantity, 0),
     });
   } catch (err) {
     console.error("Error in updateQuantity:", err);
@@ -191,18 +203,28 @@ const removeFromCart = async (req, res) => {
       });
     }
 
-    const user = await UserAuth.findById(user_id);
-    if (!user) {
+    const cart = await Cart.findOne({ user_id });
+
+    if (!cart) {
       return res
         .status(404)
-        .json({ success: false, message: "User not found" });
+        .json({ success: false, message: "Cart not found for user" });
     }
 
-    user.cart = user.cart.filter(
-      (item) => item.food_item.toString() !== product_id
+    const initialLength = cart.items.length;
+
+    cart.items = cart.items.filter(
+      (item) => item.product_id.toString() !== product_id
     );
 
-    await user.save();
+    if (cart.items.length === initialLength) {
+      return res.status(404).json({
+        success: false,
+        message: "Item not found in cart",
+      });
+    }
+
+    await cart.save();
 
     res.status(200).json({
       success: true,
@@ -218,27 +240,31 @@ const clearCart = async (req, res) => {
     const { user_id } = req.body;
 
     if (!user_id) {
-      return res
-        .status(400)
-        .json({ success: false, message: "user_id required" });
+      return res.status(400).json({
+        success: false,
+        message: "user_id is required",
+      });
     }
 
-    const user = await UserAuth.findById(user_id);
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+    const cart = await Cart.findOne({ user_id });
+
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: "Cart not found for this user",
+      });
     }
 
-    user.cart = [];
-    await user.save();
+    cart.items = [];
+    await cart.save();
 
     res.status(200).json({
       success: true,
       message: "Cart cleared successfully!",
-      cart: user.cart,
+      cart: user_id.cart,
     });
   } catch (err) {
+    console.error("Error in clearCart:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -254,46 +280,42 @@ const placeOrder = async (req, res) => {
       });
     }
 
-    const user = await UserAuth.findById(user_id).populate("cart.food_item");
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    }
+    const cart = await Cart.findOne({ user_id }).populate("items.product_id");
 
-    if (!user.cart || user.cart.length === 0) {
+    if (!cart || cart.items.length === 0) {
       return res.status(400).json({
         success: false,
         message: "Cart is empty",
       });
     }
 
-    const totalAmountOver = user.cart.reduce((acc, item) => {
-      return acc + item.food_item.price * item.quantity;
+    const totalAmountRaw = cart.items.reduce((acc, item) => {
+      const product = item.product_id;
+      const price = product?.base_price || 0;
+      return acc + price * item.quantity;
     }, 0);
 
-    const items = user.cart.map((item) => ({
-      food_item: item.food_item._id,
+    const items = cart.items.map((item) => ({
+      food_item: item.product_id._id,
       quantity: item.quantity,
     }));
 
-    const isViva = payment_type === "viva";
     const orderData = {
       user: user_id,
       table_no,
       items,
-      payment_type: isViva ? "viva" : "cash",
+      payment_type: payment_type === "viva" ? "viva" : "cash",
       payment_status: "pending",
       status: "Pending",
       order_date: new Date(),
-      total_amount: totalAmountOver,
+      total_amount: totalAmountRaw,
     };
 
-    const totalAmount = Math.round(totalAmountOver * 100);
-    const description = "Restaurant Order";
-    const reference = `ORDER-${Date.now()}`;
-
     if (payment_type === "viva") {
+      const totalAmount = Math.round(totalAmountRaw * 100);
+      const description = "Restaurant Order";
+      const reference = `ORDER-${Date.now()}`;
+
       const vivaOrder = await createVivaOrder(
         totalAmount,
         description,
@@ -301,13 +323,7 @@ const placeOrder = async (req, res) => {
       );
 
       const newOrder = await OrderModel.create({
-        user: user_id,
-        table_no,
-        payment_type: "viva",
-        payment_status: "pending",
-        status: "Pending",
-        order_date: new Date(),
-        total_amount: totalAmount,
+        ...orderData,
         viva_order_code: vivaOrder.orderCode,
       });
 
@@ -322,8 +338,8 @@ const placeOrder = async (req, res) => {
 
     const newOrder = await OrderModel.create(orderData);
 
-    user.cart = [];
-    await user.save();
+    cart.items = [];
+    await cart.save();
 
     return res.status(200).json({
       success: true,

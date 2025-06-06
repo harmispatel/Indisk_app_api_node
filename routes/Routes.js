@@ -73,6 +73,12 @@ const {
   updateQuantity,
 } = require("../controllers/CartController");
 
+const {
+  getTables,
+  createTable,
+  deleteTable,
+} = require("../controllers/TableController");
+
 router.get("/auth-user-list", getAuthUsers);
 router.post("/login", upload.none(), loginUser);
 router.post("/signup", upload.none(), registerUser);
@@ -142,5 +148,9 @@ router.post("/update-quantity", upload.none(), updateQuantity);
 router.post("/remove-to-cart", upload.none(), removeFromCart);
 router.post("/clear-cart", upload.none(), clearCart);
 router.post("/place-order", upload.none(), placeOrder);
+
+router.post("/get-tables", upload.none(), getTables);
+router.post("/create-table", upload.none(), createTable);
+router.delete("/delete-table", upload.none(), deleteTable);
 
 module.exports = router;
