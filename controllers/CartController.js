@@ -300,51 +300,72 @@ const placeOrder = async (req, res) => {
       quantity: item.quantity,
     }));
 
-    const orderData = {
-      user: user_id,
+    let order;
+    let isNewOrder = false;
+
+    let activeOrder = await OrderModel.findOne({
       table_no,
-      items,
-      payment_type: payment_type === "viva" ? "viva" : "cash",
-      payment_status: "pending",
-      status: "Pending",
-      order_date: new Date(),
-      total_amount: totalAmountRaw,
-    };
+      status: { $in: ["Pending", "Preparing"] },
+    });
 
-    if (payment_type === "viva") {
-      const totalAmount = Math.round(totalAmountRaw * 100);
-      const description = "Restaurant Order";
-      const reference = `ORDER-${Date.now()}`;
+    if (activeOrder) {
+      activeOrder.items = activeOrder.items.concat(items);
+      activeOrder.total_amount += totalAmountRaw;
+      await activeOrder.save();
+      order = activeOrder;
+    } else {
+      const orderData = {
+        user: user_id,
+        table_no,
+        items,
+        payment_type: payment_type === "viva" ? "viva" : "cash",
+        payment_status: "pending",
+        status: "Pending",
+        order_date: new Date(),
+        total_amount: totalAmountRaw,
+      };
 
-      const vivaOrder = await createVivaOrder(
-        totalAmount,
-        description,
-        reference
-      );
+      if (payment_type === "viva") {
+        const totalAmount = Math.round(totalAmountRaw * 100);
+        const description = "Restaurant Order";
+        const reference = `ORDER-${Date.now()}`;
 
-      const newOrder = await OrderModel.create({
-        ...orderData,
-        viva_order_code: vivaOrder.orderCode,
-      });
+        const vivaOrder = await createVivaOrder(
+          totalAmount,
+          description,
+          reference
+        );
 
-      return res.status(200).json({
-        success: true,
-        message: "Redirect to Viva Wallet for payment",
-        checkoutUrl: vivaOrder.checkoutUrl,
-        orderCode: vivaOrder.orderCode,
-        orderId: newOrder._id,
-      });
+        order = await OrderModel.create({
+          ...orderData,
+          viva_order_code: vivaOrder.orderCode,
+        });
+
+        cart.items = [];
+        await cart.save();
+
+        return res.status(200).json({
+          success: true,
+          message: "Redirect to Viva Wallet for payment",
+          checkoutUrl: vivaOrder.checkoutUrl,
+          orderCode: vivaOrder.orderCode,
+          orderId: order._id,
+        });
+      } else {
+        order = await OrderModel.create(orderData);
+        isNewOrder = true;
+      }
     }
-
-    const newOrder = await OrderModel.create(orderData);
 
     cart.items = [];
     await cart.save();
 
     return res.status(200).json({
       success: true,
-      message: "Order placed successfully",
-      order: newOrder,
+      message: isNewOrder
+        ? "Order placed successfully"
+        : "Order updated successfully",
+      order,
     });
   } catch (err) {
     console.error("placeOrder error:", err);
